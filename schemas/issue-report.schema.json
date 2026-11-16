@@ -3,29 +3,97 @@
   "title": "Review issue report",
   "type": "object",
   "additionalProperties": false,
-  "required": ["gate", "reviewer", "model", "artifact", "commit", "issues", "verdict"],
+  "required": [
+    "gate",
+    "reviewer",
+    "model",
+    "artifact",
+    "commit",
+    "issues",
+    "verdict"
+  ],
   "properties": {
-    "gate": { "type": "string", "enum": ["G0", "G1", "G2", "G3", "G4", "G5"] },
-    "reviewer": { "type": "string" },
-    "model": { "type": "string" },
-    "artifact": { "type": "string" },
-    "commit": { "type": "string" },
+    "gate": {
+      "type": "string",
+      "enum": [
+        "G0",
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5"
+      ]
+    },
+    "reviewer": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "artifact": {
+      "type": "string"
+    },
+    "commit": {
+      "type": "string"
+    },
     "issues": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "severity", "location", "claim", "evidence", "suggested_fix"],
+        "required": [
+          "id",
+          "severity",
+          "location",
+          "claim",
+          "evidence",
+          "suggested_fix"
+        ],
         "properties": {
-          "id": { "type": "string", "pattern": "^G[0-5]/[a-z0-9-]+/[0-9]+$" },
-          "severity": { "type": "string", "enum": ["blocking", "major", "minor"] },
-          "location": { "type": "string" },
-          "claim": { "type": ["string", "null"] },
-          "evidence": { "type": "string" },
-          "suggested_fix": { "type": "string" }
+          "id": {
+            "type": "string",
+            "pattern": "^G[0-5]/[a-z0-9-]+/[0-9]+$"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "blocking",
+              "major",
+              "minor"
+            ]
+          },
+          "location": {
+            "type": "string"
+          },
+          "claim": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "suggested_fix": {
+            "type": "string"
+          },
+          "duplicate_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^G[0-5]/[a-z0-9-]+/[0-9]+$",
+            "description": "Set by the orchestrator only. ID of the canonical issue this one duplicates. Resolving the canonical issue resolves this one."
+          }
         }
       }
     },
-    "verdict": { "type": "string", "enum": ["accept", "revise"] }
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "accept",
+        "revise"
+      ]
+    }
   }
 }

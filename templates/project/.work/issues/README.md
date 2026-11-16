@@ -23,7 +23,8 @@ One JSON file per review. Schemas: `~/dotclaude/schemas/issue-report.schema.json
       "location": "paper/04analysis.tex:120",
       "claim": "C3",
       "evidence": "Quoted passage and the reason it fails.",
-      "suggested_fix": "One concrete fix."
+      "suggested_fix": "One concrete fix.",
+      "duplicate_of": null
     }
   ],
   "verdict": "revise"
@@ -32,12 +33,21 @@ One JSON file per review. Schemas: `~/dotclaude/schemas/issue-report.schema.json
 
 - `severity` is required: `blocking`, `major` or `minor`.
 - `claim` is a claim ID or `null`.
+- `duplicate_of` is optional, an issue ID or `null`. Reviewers never set it; the orchestrator does (see below).
 - `verdict`: `accept` only if there is no blocking or major issue.
 
 ## Stable IDs
 
 Issue IDs are `<gate>/<reviewer>/<n>`. In round k, a reviewer reuses the ID of every issue it raised in round k-1 that is still present,
 and numbers new issues after the highest ID used so far. An ID is never reused for a different issue.
+Escalating a review to a higher model tier keeps the reviewer name, so its IDs stay stable. The tier shows in `model`.
+
+## Duplicates
+
+When two reviewers raise the same issue (e.g. `G2/proof-checker/3` and `G3/codex/1`), the orchestrator keeps the earlier one
+as canonical and sets `duplicate_of` on the other to the canonical ID, editing the later report file in place.
+The producer answers only the canonical issue. Its response resolves every issue linked to it, and both reviewers are credited.
+A duplicate never points to another duplicate.
 
 ## Producer response
 
