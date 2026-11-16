@@ -1,0 +1,58 @@
+# Global Claude Instructions
+
+## Identity
+
+I am assisting an academic blockchain/distributed systems researcher.
+Work spans consensus protocols, payment schemes, cryptographic security proofs, and distributed ledger theory.
+
+## Starting a research project
+
+Before drafting anything for a research project you have not worked on before in this
+repo/session, check for a `resources/` folder at the project root. If it exists, read
+everything in it before writing a single sentence: bibliography files, problem statements,
+notes, prior drafts, related-work summaries, anything else placed there. Treat it as the
+authoritative context for the project, not as optional background.
+
+Do this before consulting `writing_style.md` for prose mechanics. `writing_style.md` governs
+how to write; `resources/` governs what is true and what is already decided about the project
+(terminology already fixed, results already proven, prior art already identified). If the two
+ever appear to conflict on content (not style), ask rather than guessing.
+
+If no `resources/` folder exists, say so and ask whether one should be created, rather than
+proceeding from general knowledge of the area.
+
+## Writing
+
+When writing or editing academic prose — paper sections, definitions, lemmas, theorems, proofs, remarks, or evaluation text — read `~/.claude/writing_style.md` first and follow it fully.
+
+The short version:
+- Simple sentences first. Longer sentences only after the base is established.
+- No em dashes.
+- No novel or ambiguous terminology. Every term must have a precise, standard meaning.
+- No elaborate or convoluted constructions. One idea per sentence.
+- Do not make unsound claims. If something is not proven, say so explicitly.
+- Write like a cryptographer: words mean specific things, and the logic must follow step by step.
+- Section, subsection, and `\paragraph{}` titles are plain noun phrases naming the topic (e.g. "Full nodes", "Throughput"). They are never full sentences, claims, or rhetorical hooks. See `writing_style.md` for the full rule.
+
+## LaTeX
+
+When writing or editing LaTeX, read `~/.claude/writing_style.md` for the full conventions.
+
+The short version:
+- Document class: Financial Cryptography and Data Security (FC) format, i.e. Springer `llncs` with bibliography style `splncs04`.
+- Always use defined macros. Never write raw text where a macro exists (`\tx` not `tx`, `\pk` not `pk`, etc.).
+- Always use `\Cref{}` for cross-references. Never `\ref{}`.
+- Label prefixes: `def.`, `lem.`, `cor.`, `thm.`, `asm.`, `rem.`, `alg.`, `sec.`, `fig.`, `line.`
+- One algorithm per file in `algorithms/`, input'd from the section file.
+- Build: `latexmk -synctex=1 -pdf -outdir=output main.tex`
+
+## Code
+
+Language preferences and project conventions are specified per-project in local `CLAUDE.md` files.
+Default to Rust for systems work and Python for scripts unless told otherwise.
+
+## General
+
+- Be direct. Do not pad responses.
+- Do not invent context. Ask if something is unclear.
+- Prefer short responses when the task is short.
