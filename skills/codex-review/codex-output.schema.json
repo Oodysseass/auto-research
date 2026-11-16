@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["issues", "verdict"],
+  "properties": {
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "location", "claim", "evidence", "suggested_fix"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^G3/codex/[0-9]+$" },
+          "severity": { "type": "string", "enum": ["blocking", "major", "minor"] },
+          "location": { "type": "string" },
+          "claim": { "type": ["string", "null"] },
+          "evidence": { "type": "string" },
+          "suggested_fix": { "type": "string" }
+        }
+      }
+    },
+    "verdict": { "type": "string", "enum": ["accept", "revise"] }
+  }
+}
