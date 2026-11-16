@@ -1,11 +1,9 @@
 # Academic writing: LaTeX conventions
 
 Moved from the former `~/.claude/writing_style.md`. Load for any `.tex` work.
-Project macros live in the project's `.work/glossary.md` (example: `templates/project/glossary.podovery.md`).
+Project macros live in the project's `.work/glossary.md`.
 
 ## LaTeX conventions
-
-The reference project is `podovery`. Follow its conventions exactly.
 
 ### Document structure
 
@@ -43,6 +41,19 @@ Put keywords inside the abstract with `\keywords{A \and B \and C}`.
 
 Always use macros for recurring symbols. Never write raw text where a macro exists.
 The macro list is project-specific. Read it from the project's `.work/glossary.md`.
+The exact macro names come from prompt 02 Stage G and from each project's glossary.
+Every project defines macros for the following patterns:
+
+- System name: one macro for the name of the system, typeset in bold.
+- Recurring objects and fields: one macro per object or field of the model (transactions, keys,
+  counters, states, votes, certificates, and so on).
+- Function names: a generic macro that typesets a function name in typewriter font, plus one
+  shorthand macro per recurring function.
+- Variable names: a generic macro that typesets a variable name in sans serif.
+- Algorithm keywords: macros for true, false, return, break and concatenation.
+- Algorithm event handlers: a begin and end macro pair for an event-handler block.
+- Algorithm comments: one macro for a full-line comment and one for an inline comment, right-aligned.
+- Author notes: one colored note macro per author, plus a generic todo macro. Remove all notes before submission.
 
 ### Theorem environments
 
@@ -97,11 +108,8 @@ line.: algorithm lines
 
 Always use `\Cref{}` (capital C, from cleveref). Never `\ref{}` or `\eqref{}`.
 
-```latex
-\Cref{lem.unique-direct}         % "Lemma 3"
-\Cref{alg.validator.voting}      % "Algorithm 1"
-\Cref{line.direct-child}         % "Line 5"
-```
+EXAMPLES: to be populated by prompt 02 Stage G.
+One `\Cref{}` call each for a lemma, an algorithm and an algorithm line, with the rendered text as a comment.
 
 For multiple references: `\Cref{lem.a,lem.b}` produces "Lemmas 3 and 4".
 
@@ -111,13 +119,13 @@ Use `\mathbb{N}` for natural numbers. Use `\kappa` for security parameter.
 Quantifiers: `\forall`, `\exists`, `\land`, `\lor`, `\neg`, `\in`, `\notin`, `\subseteq`, `\cup`, `\cap`.
 Set comprehension: `\{ x \colon P(x) \}` (use `\colon`, not bare `:`).
 Intervals: `[k_1, k_2)` with standard bracket notation.
-Concatenation: `\concat` (expands to `\,\|\,`).
+Concatenation: use the project's concatenation macro, typeset as `\,\|\,`.
 
 ### Algorithms
 
 One algorithm per file in `algorithms/`. Input into the section file with `\input{algorithms/alg.name}`.
 
-Use `algpseudocode` style. State lines use `\State`. Conditions use `\If`, `\ElsIf`, `\Else`, `\EndIf`. Loops use `\For`, `\EndFor`, `\While`, `\EndWhile`. Event handlers use `\On`, `\EndOn`.
+Use `algpseudocode` style. State lines use `\State`. Conditions use `\If`, `\ElsIf`, `\Else`, `\EndIf`. Loops use `\For`, `\EndFor`, `\While`, `\EndWhile`. Event handlers use the project's event-handler macro pair.
 
 Label individual lines with `\label{line.name}` placed after the statement on the same line so `\Cref{line.name}` resolves correctly.
 
@@ -128,4 +136,4 @@ Example: `\paragraph{Throughput}`, `\paragraph{Voting}`, `\paragraph{Execution}`
 
 ### Citations
 
-Use `\cite{key}` inline. Use `\cite{fastpay}` for Fastpay. Bibliography file is `bibliography/ref.bib`. Style is `splncs04`.
+Use `\cite{key}` inline. Bibliography file is `bibliography/ref.bib`. Style is `splncs04`.

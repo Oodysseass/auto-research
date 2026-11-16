@@ -1,7 +1,6 @@
 # Academic writing: mechanics
 
 Moved verbatim from the former `~/.claude/writing_style.md`. Applies to all academic prose.
-The reference excerpts at the end use podovery macros; see `templates/project/glossary.podovery.md`.
 
 ---
 
@@ -89,7 +88,7 @@ A heading is not allowed to be a sentence, a claim, a question, or a rhetorical 
 reads as the next beat of an argument. This applies to `\section{}`, `\subsection{}`, and
 especially `\paragraph{}`, which is used constantly and is where this failure mode creeps in.
 
-**Good**, matching the reference example already in this file:
+**Good**:
 ```
 \paragraph{Throughput}
 \paragraph{Full nodes}
@@ -158,9 +157,11 @@ Not:
 
 - Em dashes anywhere.
 - Semicolons joining long independent clauses.
-- Sentences longer than ~30 words in definitions or proof steps.
+- Unnecessary verbosity. A sentence is too long when it can be split, or shortened, without losing
+  meaning. A long sentence is fine when the relationship between its clauses is the point. See
+  "One idea per sentence" and "Rhythm" above.
 - Passive constructions that hide the subject in proofs.
-- Raw symbols where a macro exists (`tx` instead of `\tx`).
+- Raw symbols where a macro exists (raw text instead of the project's macro).
 - `\ref{}` instead of `\Cref{}`.
 - Hardcoded theorem names instead of `\Cref{}`.
 - Section, subsection, or `\paragraph{}` titles phrased as sentences, claims, or rhetorical hooks
@@ -177,57 +178,21 @@ Not:
 
 ## Reference excerpts
 
-### Primary reference: podovery (LaTeX source)
+EXAMPLES: to be populated by prompt 02 Stage G.
 
-**Good: definition**
-```latex
-\begin{definition}[Transaction $\tx$]
-    We call a transaction the structure
-    $\tx = (\pk, \nonce, \body, \parent, \sigma)$, where
-    $\pk \in \{0, 1\}^\kappa$ is the public key of the signer,
-    $\nonce \in \mathbb{N}$ is the nonce of the transaction, $\body$ is the
-    application logic of the transaction, $\parent$ is a transaction $\tx'$ with
-    $\tx'.\nonce = \tx.\nonce - 1$ and $\sigma$ is the signature of the client.
-\end{definition}
-```
+Each example is a short good excerpt in LaTeX, followed by one "Observe:" line naming the rules it shows.
+No example may come from a single client or research project.
 
-Observe: flat enumeration, each field on its own clause, no digression.
-
-**Good: proof**
-```latex
-\begin{proof}
-    Suppose towards a contradiction that two honest validators $R_1$ and $R_2$
-    have directly finalized different transactions $\tx$ and $\tx'$ for nonce
-    $k$, with $\tx \neq \tx'$. By definition, any honest validator that directly
-    finalizes a transaction $\tx$ for nonce $h$ must have received at least $n-f$
-    votes on $\tx$. From \Cref{lem.n-f-intersection}, the sets of votes for
-    $\tx$ and $\tx'$ must share at least $n-3f$ votes from honest validators.
-    From \Cref{alg.validator.voting}, an honest validator only votes once per
-    nonce. Thus the shared votes must be on the same transaction. Therefore,
-    $\tx' = \tx$. Contradiction.
-\end{proof}
-```
-
-Observe: assumption stated first. Each sentence advances by one step. "Contradiction." is a single word on its own sentence.
-
-**Good: evaluation paragraph**
-```latex
-\paragraph{Throughput}
-
-Throughput is the number of transactions that can be finalized per unit of time.
-In order to easily evaluate the throughput, we normalize the time w.r.t. the
-network delay. Namely, we measure the amount of transactions that can be
-finalized in a time window of size $\Delta$.
-```
-
-Observe: first sentence is shortest. Each sentence adds one layer.
+- Definition: a structure or property defined as a flat enumeration, one field per clause, no digression.
+- Proof: a contradiction proof that states the assumption first, advances one step per sentence with a named source, and closes on the contradicted fact.
+- Evaluation paragraph: a `\paragraph{}` with a noun-phrase title whose first sentence is the shortest and each later sentence adds one layer.
 
 ---
 
 ## Checklist before submitting a draft
 
 - [ ] Every term in a proof appears in a definition or is standard in the literature.
-- [ ] No sentence in a proof or definition exceeds approximately 30 words.
+- [ ] No unnecessary verbosity: no sentence can be split or shortened without losing meaning, and the text keeps its rhythm (see "One idea per sentence" and "Rhythm").
 - [ ] No em dashes.
 - [ ] No "clearly", "obviously", "it is easy to see" unless the step is genuinely immediate.
 - [ ] First sentence of each paragraph is the shortest.
