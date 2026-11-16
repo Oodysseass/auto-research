@@ -1,0 +1,4 @@
+#!/bin/sh
+# Enable once per clone: git config core.hooksPath .githooks
+# Checks the working tree, so stage your regenerated variants before committing.
+exec python3 "$(git rev-parse --show-toplevel)/scripts/build_mythos_variants.py" --check

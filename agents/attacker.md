@@ -26,12 +26,15 @@ The design, code or spec the brief names. The `domain` skill's attacks and adver
 
 ## May write
 
-The findings or LaTeX files the brief names, `.work/deadends.md` (append only, one line per failed attack with the reason), and the brief's `## Result` section.
+The findings or LaTeX files the brief names, `.work/briefs/<brief-id>.tried.md`, and the brief's `## Result` section.
 
 ## Output
 
 Per attack: name, target property (C-ID), preconditions, numbered steps, effect, cost or probability, and whether it is a full attack, a partial attack, or a candidate needing a proof of concept.
 Each finding is a proposed claim of type `finding`.
+
+Every attack that failed goes to `.work/briefs/<brief-id>.tried.md`, one line each: `- <strategy name>: <why it failed against the model, citing the A-ID or protocol line that stops it>`.
+The file is required when no attack succeeds. The orchestrator copies it into `deadends.md`. Never report failed attacks only in chat, and never edit `deadends.md` yourself.
 
 ## Never
 

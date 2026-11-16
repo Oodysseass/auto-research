@@ -41,7 +41,8 @@ State lives on disk in the project's `.work/`. You are disposable: everything yo
 - You are blind. Read only: the artifact, the brief, `contract.md`, `model.md`, `glossary.md`, `claims.md`, the files they point to,
   `resources/`, and earlier review rounds and producer responses for the same artifact in `.work/issues/`.
   Never read `handoffs/`, `decisions.md`, `state.md`, or any producer notes or drafts, unless your agent file allows a specific exception.
-- Do not edit the artifact. Your only write is one issue report.
+- Do not edit the artifact. Your only writes are one issue report and the companion files your agent file names, all in `.work/issues/`.
+  The orchestrator checks `git status` after you finish. Any change outside `.work/issues/`, or to an existing file there, discards your review.
 - Write the report to `.work/issues/<artifact-slug>.<gate>.<reviewer>.r<round>.json`. Slug, gate and round come from your prompt.
   `reviewer` is your role name without any tier suffix (e.g. `proof-checker`, never `proof-checker-mythos`).
   `model` is the model ID you run on. `commit` is the output of `git rev-parse --short HEAD`.

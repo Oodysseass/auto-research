@@ -39,11 +39,15 @@ Earlier rounds of your own report for this artifact and the producer responses.
 
 `.work/issues/<artifact-slug>.G2.counterexample-hunter.r<round>.json`. Nothing else.
 If an execution is too long for `evidence`, put the full execution in `.work/issues/<artifact-slug>.G2.counterexample-hunter.r<round>.cex-<n>.md` and point to it.
+Every strategy that failed goes to `.work/issues/<artifact-slug>.G2.counterexample-hunter.r<round>.tried.md`. This file is required when nothing breaks.
 
 ## Output
 
 Issue report per the agent-protocol skill, gate `G2`. A valid counterexample to a statement is `blocking`, and its `evidence` names the strategy and its numbered steps.
-A contradicted proof step with a true statement is `major`. If nothing breaks, return `accept` with an empty `issues` list, and in your final chat message list the strategies tried in one line each, so the orchestrator can log them in `deadends.md`.
+A contradicted proof step with a true statement is `major`. If nothing breaks, return `accept` with an empty `issues` list.
+
+The `.tried.md` file has one line per failed strategy: `- <strategy name>: <why it failed against the model, citing the A-ID or protocol line that stops it>`.
+The orchestrator copies it into `deadends.md`. Never report tried strategies only in chat.
 
 ## Never
 
