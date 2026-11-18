@@ -3,7 +3,8 @@
 File name: `briefs/<id>.md`, with `<id>` = `<stage>-<short-slug>`, e.g. `S4-safety-lemma`.
 
 - stage: <playbook stage>
-- status: <open | done | escalated>
+- status: <open | done | escalated | requeued>
+- stage type: <literature | refine | model | properties | statements | design | proof-lemma | proof-main | attacks | exposition | report | review | other>
 - assigned agent: <agent name>
 - model: <model ID>
 - effort: <low | medium | high | xhigh | max>
@@ -40,9 +41,12 @@ Each criterion traces to requirement IDs (R-IDs) or claim IDs (C-IDs).
 
 ## Budget
 
-- rounds: <max review rounds, at most 5>
-- tokens: <rough size, e.g. 200k>
-Overrun means stop and escalate to me.
+Automatic. Never shown to the human. `tokens` from `python3 ~/dotclaude/scripts/budgets.py get <stage type>`.
+`review_status.py` applies it: one 50% extension when the latest round raised new issues, else the loop counts as stalled.
+
+- rounds: 5
+- tokens: <from budgets.py>
+- extended: no
 
 ## Review log
 

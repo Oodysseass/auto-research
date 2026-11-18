@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 pilot/
 pilot-guide/logs/
+skills/model-routing/budgets.json

@@ -6,6 +6,6 @@ description: Model and effort routing for the research workflow. Which agent, mo
 # Model routing
 
 Read [routing.md](routing.md) before writing a brief or dispatching an agent.
-It is the only source of truth for tiers, per-agent ladders and budgets. Agent files carry the default tier; routing.md says when to leave it.
+It is the only source of truth for tiers, per-agent ladders and automatic budgets (`scripts/budgets.py`). Agent files carry the default tier; routing.md says when to leave it.
 
 The orchestrator is the only dispatcher. Agents never spawn agents.

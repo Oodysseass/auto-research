@@ -1,11 +1,196 @@
-#!/bin/sh
-# rw: start a fresh orchestrator session in the current project and run /orch.
-# Extra arguments go to claude before the prompt (e.g. rw --permission-mode plan).
-# The orchestrator tier is set on the next line only (see skills/model-routing/routing.md).
-RW_MODEL=claude-opus-5-5 RW_EFFORT=high
+#!/usr/bin/python3
+"""rw: run orchestrator sessions in a loop in the current project, each with fresh context.
 
-if [ ! -f .work/state.md ]; then
-  echo "rw: no .work/state.md in $(pwd). cd to the project root, or run /intake first." >&2
-  exit 2
-fi
-exec claude --model "$RW_MODEL" --effort "$RW_EFFORT" "$@" "/orch"
+Usage: rw [--stop-before <stage>] [extra claude arguments, e.g. --permission-mode plan]
+  --stop-before S8   stop the loop instead of starting a session whose stage (state.md `- stage:`) names S8.
+
+Each session runs `claude --model RW_MODEL --effort RW_EFFORT ... /orch`. The orchestrator asks the human inside the
+session (AskUserQuestion; a hook sends a notification). The session ends only through /handoff, which writes
+.work/.rw/end.json; the Stop hook marks it stopped when the turn ends; rw then ends the session and reads the outcome:
+  stage-done, context  start the next session at once
+  limit                notify; wait until the usage limit resets (Enter resumes early), then start the next session
+  project-done, error  notify and stop
+  no marker            the human quit the session: stop
+Ctrl+C between sessions stops the loop. Inside a session, Ctrl+C belongs to Claude Code; quitting it stops the loop.
+Stdlib only. Test hooks: $RW_CLAUDE (the claude command), $RW_NOTIFY_CMD, $RW_POLL (seconds), $RW_MAX_SESSIONS.
+"""
+import json
+import os
+import select
+import shlex
+import signal
+import subprocess
+import sys
+import threading
+import time
+from datetime import datetime
+from pathlib import Path
+
+# The orchestrator tier is set on the next line only (see skills/model-routing/routing.md).
+RW_MODEL, RW_EFFORT = "claude-opus-5-5", "high"
+
+DOTCLAUDE = Path(__file__).resolve().parent.parent
+END = Path(".work/.rw/end.json")
+POLL = float(os.environ.get("RW_POLL", "1"))
+
+
+def say(msg):
+    print(f"rw: {msg}", flush=True)
+
+
+def notify(title, message):
+    cmd = os.environ.get("RW_NOTIFY_CMD")
+    try:
+        if cmd:
+            subprocess.run([cmd, title, message], timeout=5)
+        elif sys.platform == "darwin":
+            esc = lambda x: x.replace("\\", "\\\\").replace('"', '\\"')
+            subprocess.run(["osascript", "-e", f'display notification "{esc(message)}" with title "{esc(title)}" '
+                            'sound name "Glass"'], timeout=5, capture_output=True)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def read_end(run):
+    try:
+        d = json.loads(END.read_text())
+    except (OSError, ValueError):
+        return None
+    return d if d.get("run") == run else None
+
+
+def watch(proc, run, stop_evt):
+    """End the session once the marker of this run is stopped (the turn after /handoff has ended)."""
+    while not stop_evt.is_set() and proc.poll() is None:
+        d = read_end(run)
+        if d and d.get("stopped"):
+            time.sleep(POLL)  # let Claude Code finish writing the transcript
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=15)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+            return
+        stop_evt.wait(POLL)
+
+
+def run_session(run, extra):
+    cmd = shlex.split(os.environ.get("RW_CLAUDE", "claude")) + ["--model", RW_MODEL, "--effort", RW_EFFORT] + extra + ["/orch"]
+    env = dict(os.environ, RW_LOOP="1", RW_RUN=run)
+    old = signal.signal(signal.SIGINT, signal.SIG_IGN)  # Ctrl+C inside the session belongs to Claude Code
+    try:
+        proc = subprocess.Popen(cmd, env=env, preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_DFL))
+        stop_evt = threading.Event()
+        t = threading.Thread(target=watch, args=(proc, run, stop_evt), daemon=True)
+        t.start()
+        code = proc.wait()
+        stop_evt.set()
+        t.join(timeout=5)
+    finally:
+        signal.signal(signal.SIGINT, old)
+    return code
+
+
+def wait_for_reset(resets_at):
+    now = time.time()
+    target = (resets_at + 60) if resets_at else None
+    when = datetime.fromtimestamp(target).strftime("%H:%M") if target else "unknown"
+    say(f"usage limit reached. Resumes at {when}. Enter: resume now. Ctrl+C: stop.")
+    while True:
+        left = (target - time.time()) if target else None
+        if left is not None and left <= 0:
+            return
+        timeout = min(left, 60) if left is not None else 60
+        try:
+            r, _, _ = select.select([sys.stdin], [], [], timeout)
+        except (OSError, ValueError):
+            r = []
+            time.sleep(timeout)
+        if r:
+            sys.stdin.readline()
+            return
+        if target is None and now + 6 * 3600 < time.time():
+            return
+
+
+def current_stage():
+    import re
+    try:
+        m = re.search(r"^- stage:\s*(.*)$", Path(".work/state.md").read_text(), re.M)
+    except OSError:
+        return ""
+    return m.group(1) if m else ""
+
+
+def stage_matches(stage_line, token):
+    import re
+    return bool(token) and re.search(rf"(?<![\w-]){re.escape(token)}(?![\w-])", stage_line) is not None
+
+
+def main(argv):
+    stop_before = None
+    if "--stop-before" in argv:
+        i = argv.index("--stop-before")
+        if i + 1 >= len(argv):
+            print("rw: --stop-before needs a stage, e.g. S8", file=sys.stderr)
+            return 2
+        stop_before = argv[i + 1]
+        argv = argv[:i] + argv[i + 2:]
+    if not Path(".work/state.md").is_file():
+        print(f"rw: no .work/state.md in {os.getcwd()}. cd to the project root, or run /intake first.", file=sys.stderr)
+        return 2
+    try:
+        subprocess.run([sys.executable, str(DOTCLAUDE / "scripts" / "budgets.py"), "recalibrate"],
+                       capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    project = Path.cwd().name
+    max_sessions = int(os.environ.get("RW_MAX_SESSIONS", "0"))
+    n = 0
+    try:
+        while True:
+            if stop_before and stage_matches(current_stage(), stop_before):
+                notify(f"rw: paused in {project}", f"Stopped before {stop_before}, as asked.")
+                say(f"stopped before {stop_before}: run `rw` and type your instruction as soon as the session opens")
+                return 0
+            n += 1
+            run = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{os.getpid()}-{n}"
+            try:
+                END.unlink()
+            except OSError:
+                pass
+            say(f"session {n} starting")
+            code = run_session(run, argv)
+            d = read_end(run)
+            outcome = d.get("outcome") if d else None
+            reason = (d or {}).get("reason", "")
+            if outcome in ("stage-done", "context"):
+                say(f"session {n} ended ({outcome}: {reason}). Next session starts now. Ctrl+C to stop.")
+                time.sleep(2)
+            elif outcome == "limit":
+                notify(f"rw: usage limit in {project}", "Paused until the limit resets.")
+                wait_for_reset(d.get("resets_at"))
+            elif outcome == "project-done":
+                notify(f"rw: {project} done", reason or "All stages done.")
+                say(f"project done: {reason}")
+                return 0
+            elif outcome == "error":
+                notify(f"rw: stopped in {project}", reason or "error")
+                say(f"stopped on error: {reason}")
+                return 1
+            else:
+                say(f"session {n} ended without a handoff (exit {code}). Loop stopped.")
+                notify(f"rw: stopped in {project}", "The session ended without a handoff.")
+                return 0 if code == 0 else 1
+            if max_sessions and n >= max_sessions:
+                say("session limit for this run reached")
+                return 0
+    except KeyboardInterrupt:
+        print()
+        say("stopped (Ctrl+C)")
+        return 130
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

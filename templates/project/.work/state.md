@@ -13,12 +13,14 @@ Updated by the orchestrator at the end of every session (`/handoff`). Read first
 
 1. <action>
 
-## Open approvals
+## Pending decisions
 
-- <event from approvals.md, artifact, since YYYY-MM-DD | none>
+Cards in `.work/decisions/` that are `open` or `provisional` (`python3 ~/dotclaude/scripts/decisions.py list`).
 
-## Budget used
+- <D-ID, class, status, one-line question | none>
 
-| Brief | Rounds used / budget | Tokens used / budget (rough) |
-|---|---|---|
-| <id> | <n / m> | <k / K> |
+## Requeued
+
+Briefs requeued by a reversed decision. Run them first.
+
+- none

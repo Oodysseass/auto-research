@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Hooks for the research workflow. Usage: rw_hooks.py <event>, hook input JSON on stdin.
 
-Events: session-start, prompt, pre-compact, stop, pre-tool-use.
-Every hook does nothing unless $CLAUDE_PROJECT_DIR/.work/ exists (fallback: the input's cwd).
+Events: session-start, prompt, pre-compact, stop, pre-tool-use, ask, post-agent, stop-failure, statusline.
+Every hook does nothing unless $CLAUDE_PROJECT_DIR/.work/ exists (fallback: the input's cwd), except statusline,
+which prints a status line in every project and caches context and usage-limit data for the other hooks.
+Notifications: $RW_NOTIFY_CMD <title> <message> if set, else osascript on macOS.
+bin/rw sets RW_LOOP=1 and RW_RUN=<id>; the Stop hook uses them to end a session after /handoff.
 Internal errors fail open: exit 0 with no output, so a bug never blocks a session.
 Stdlib only. Never reads or sets API keys.
 """
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -25,7 +29,14 @@ REVIEWERS = {
     "conformance-reviewer", "assumption-auditor", "proof-checker", "counterexample-hunter",
     "citation-verifier", "style-reviewer", "regression-checker", "arbiter",
 }
+# Roles that may write (create or overwrite) only inside one .work/ subdirectory.
+SCOPED_WRITERS = {"summarizer": "packets"}
 WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
+# Context threshold for ending an orchestrator session: min(RW_CONTEXT_LIMIT, 60% of the window). See orch skill.
+CONTEXT_LIMIT = int(os.environ.get("RW_CONTEXT_LIMIT", "300000"))
+CONTEXT_FRACTION = 0.6
+# Files under .work/ that hooks and scripts write automatically; they never count as unrecorded work.
+AUTO_FILES = {"usage.tsv"}
 
 
 def project_dir(inp):
@@ -52,8 +63,10 @@ def snapshot(proj):
     work = proj / ".work"
     files = {}
     for p in sorted(work.rglob("*")):
-        if p.is_file() and not p.name.startswith(".") and p != work / "state.md":
-            files[str(p.relative_to(work))] = file_hash(p)
+        rel = p.relative_to(work)
+        if (p.is_file() and not any(part.startswith(".") for part in rel.parts) and p != work / "state.md"
+                and str(rel) not in AUTO_FILES):
+            files[str(rel)] = file_hash(p)
     return {"head": git(proj, "rev-parse", "HEAD"), "state": file_hash(work / "state.md"), "work": files}
 
 
@@ -145,6 +158,27 @@ def prompt(inp, proj):
     emit({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": card}})
 
 
+def write_snapshot(inp, proj, why):
+    """Snapshot handoff for work /handoff did not record. Returns the file path."""
+    base = load_baseline(inp) or {}
+    pending = unrecorded_work(inp, proj) or ([], [])
+    ts = datetime.now().strftime("%Y%m%d-%H%M")
+    tag = "auto-precompact" if why == "compaction" else "auto-limit"
+    out = proj / ".work" / "handoffs" / f"{ts}-{tag}.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    commits, changed = pending
+    status = git(proj, "status", "--porcelain") or "clean"
+    out.write_text(
+        f"# Snapshot handoff {ts} (automatic, before {why})\n\n"
+        "Written by a hook, not by /handoff. The next orchestrator runs /handoff first; it folds this file in.\n\n"
+        f"- session HEAD at start: {base.get('head') or 'none'}\n"
+        f"- HEAD now: {git(proj, 'rev-parse', 'HEAD') or 'none'}\n\n"
+        "## Commits this session\n\n" + ("\n".join(f"- {c}" for c in commits) or "- none") + "\n\n"
+        "## .work files changed this session\n\n" + ("\n".join(f"- .work/{c}" for c in changed) or "- none") + "\n\n"
+        "## git status --porcelain\n\n```\n" + status + "\n```\n")
+    return out
+
+
 def pre_compact(inp, proj):
     pending = unrecorded_work(inp, proj)
     if pending and inp.get("trigger") == "manual":
@@ -153,26 +187,60 @@ def pre_compact(inp, proj):
         sys.exit(2)
     if pending:
         # Auto-compaction: never block (blocking a context-limit recovery fails the request). Write a snapshot instead.
-        base = load_baseline(inp) or {}
-        ts = datetime.now().strftime("%Y%m%d-%H%M")
-        out = proj / ".work" / "handoffs" / f"{ts}-auto-precompact.md"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        commits, changed = pending
-        status = git(proj, "status", "--porcelain") or "clean"
-        out.write_text(
-            f"# Snapshot handoff {ts} (automatic, before auto-compaction)\n\n"
-            "Written by the PreCompact hook, not by /handoff. Run /handoff now; it folds this file in.\n\n"
-            f"- session HEAD at start: {base.get('head') or 'none'}\n"
-            f"- HEAD now: {git(proj, 'rev-parse', 'HEAD') or 'none'}\n\n"
-            "## Commits this session\n\n" + ("\n".join(f"- {c}" for c in commits) or "- none") + "\n\n"
-            "## .work files changed this session\n\n" + ("\n".join(f"- .work/{c}" for c in changed) or "- none") + "\n\n"
-            "## git status --porcelain\n\n```\n" + status + "\n```\n")
+        out = write_snapshot(inp, proj, "compaction")
         print(f"This is a research workflow session. A snapshot handoff was written to .work/handoffs/{out.name}. "
               "The summary must say: run /handoff first after compaction. Keep the active brief ID, the gate and round "
               "in progress, and every open issue ID.")
         return
     print("This is a research workflow session. Keep the active brief ID, the gate and round in progress, "
           "and every open issue ID in the summary.")
+
+
+def end_marker(proj):
+    try:
+        return json.loads((proj / ".work" / ".rw" / "end.json").read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def mark_stopped(proj, data):
+    p = proj / ".work" / ".rw" / "end.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(dict(data, stopped=True)) + "\n")
+
+
+def this_run(data):
+    return data is not None and data.get("run") == os.environ.get("RW_RUN", "manual")
+
+
+def last_human_prompt(transcript_path):
+    """Text of the last user message typed by the human (not a tool result, not a meta message), or None."""
+    try:
+        lines = Path(transcript_path).read_text().splitlines()
+    except (OSError, TypeError):
+        return None
+    for line in reversed(lines):
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        if e.get("type") != "user" or e.get("isMeta"):
+            continue
+        c = (e.get("message") or {}).get("content")
+        if isinstance(c, str):
+            return c
+        if isinstance(c, list):
+            if any(isinstance(x, dict) and x.get("type") == "tool_result" for x in c):
+                continue
+            texts = [x.get("text", "") for x in c if isinstance(x, dict) and x.get("type") == "text"]
+            if texts:
+                return "\n".join(texts)
+    return None
+
+
+def is_orch_turn(inp):
+    t = last_human_prompt(inp.get("transcript_path"))
+    return t is not None and bool(re.search(r"(^|\s|<command-name>)/orch\b", t.strip()))
 
 
 def stop(inp, proj):
@@ -186,31 +254,187 @@ def stop(inp, proj):
     if pending:
         emit({"decision": "block", "reason":
               f"Research workflow: this session made {describe(*pending)}, but .work/state.md is unchanged since the "
-              "session started. Run /handoff before stopping. If you are pausing mid-stage for the human, update "
-              ".work/state.md (Next actions, Open approvals) instead."})
+              "session started. Run /handoff before stopping."})
+        return
+    end = end_marker(proj)
+    if this_run(end):
+        if not end.get("stopped"):
+            mark_stopped(proj, end)  # bin/rw ends the session and acts on the outcome
+        return
+    if os.environ.get("RW_LOOP") and is_orch_turn(inp):
+        emit({"decision": "block", "reason":
+              "rw session: do not end the turn to ask the human or to wait. Ask with AskUserQuestion (decision card "
+              "first) and continue. End the session only through /handoff (stage done, or context threshold). "
+              "If you are blocked by an error you cannot resolve, run /handoff with outcome `error`."})
 
 
 def pre_tool_use(inp, proj):
     role = str(inp.get("agent_type") or "")
     role = role[:-len("-mythos")] if role.endswith("-mythos") else role
-    if role not in REVIEWERS or inp.get("tool_name") not in WRITE_TOOLS:
+    if inp.get("tool_name") not in WRITE_TOOLS or (role not in REVIEWERS and role not in SCOPED_WRITERS):
         return
     ti = inp.get("tool_input") or {}
     raw = ti.get("file_path") or ti.get("notebook_path") or ""
     target = Path(raw) if os.path.isabs(raw) else Path(inp.get("cwd") or proj) / raw
     target = Path(os.path.realpath(target))
-    issues = Path(os.path.realpath(proj / ".work" / "issues"))
-    inside = issues in target.parents
-    if inp.get("tool_name") == "Write" and inside and not target.exists():
-        return
-    why = ("may only create new files in .work/issues/" if not inside or inp.get("tool_name") != "Write"
-           else "may not overwrite an existing file in .work/issues/")
+    if role in SCOPED_WRITERS:
+        scope = Path(os.path.realpath(proj / ".work" / SCOPED_WRITERS[role]))
+        if scope in target.parents:
+            return
+        why = f"may only write in .work/{SCOPED_WRITERS[role]}/"
+    else:
+        issues = Path(os.path.realpath(proj / ".work" / "issues"))
+        inside = issues in target.parents
+        if inp.get("tool_name") == "Write" and inside and not target.exists():
+            return
+        why = ("may only create new files in .work/issues/" if not inside or inp.get("tool_name") != "Write"
+               else "may not overwrite an existing file in .work/issues/")
     emit({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
-          "permissionDecisionReason": f"Reviewer write guard: {role} {why}. Blocked: {raw}"}})
+          "permissionDecisionReason": f"Write guard: {role} {why}. Blocked: {raw}"}})
+
+
+# Notifications, usage, context and limits
+
+def notify(title, message):
+    cmd = os.environ.get("RW_NOTIFY_CMD")
+    try:
+        if cmd:
+            subprocess.run([cmd, title, message], timeout=5)
+        elif sys.platform == "darwin":
+            esc = lambda x: x.replace("\\", "\\\\").replace('"', '\\"')
+            subprocess.Popen(["osascript", "-e",
+                              f'display notification "{esc(message)}" with title "{esc(title)}" sound name "Glass"'],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def status_cache_path(inp):
+    sid = "".join(c for c in str(inp.get("session_id", "nosession")) if c.isalnum() or c in "-_")
+    return STATE_DIR / f"{sid}.status.json"
+
+
+def load_status(inp):
+    try:
+        return json.loads(status_cache_path(inp).read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def context_tokens(st):
+    """Tokens in the context window, from the cached statusline data. None if unknown."""
+    cw = st.get("context_window") or {}
+    cu = cw.get("current_usage") or {}
+    if cu:
+        return sum(int(cu.get(k) or 0) for k in ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
+    pct, size = cw.get("used_percentage"), cw.get("context_window_size")
+    if pct is not None and size:
+        return int(float(pct) * int(size) / 100)
+    return None
+
+
+def context_threshold(st):
+    size = (st.get("context_window") or {}).get("context_window_size")
+    return min(CONTEXT_LIMIT, int(CONTEXT_FRACTION * int(size))) if size else CONTEXT_LIMIT
+
+
+def ask(inp, proj):
+    qs = (inp.get("tool_input") or {}).get("questions") or []
+    first = qs[0].get("question", "") if qs and isinstance(qs[0], dict) else ""
+    more = f" (+{len(qs) - 1} more)" if len(qs) > 1 else ""
+    notify(f"rw: input needed in {proj.name}", (first[:150] + more) or "A question is waiting.")
+
+
+def find_key(obj, key):
+    if isinstance(obj, dict):
+        if key in obj:
+            return obj[key]
+        for v in obj.values():
+            r = find_key(v, key)
+            if r is not None:
+                return r
+    elif isinstance(obj, list):
+        for v in obj:
+            r = find_key(v, key)
+            if r is not None:
+                return r
+    return None
+
+
+def post_agent(inp, proj):
+    ti = inp.get("tool_input") or {}
+    tokens = find_key(inp.get("tool_response"), "totalTokens")
+    role = str(ti.get("subagent_type") or "general-purpose")
+    m = re.search(r"\.work/briefs/([\w.-]+)\.md", str(ti.get("prompt") or ""))
+    brief = m.group(1) if m else "none"
+    stage_type = "other"
+    if m:
+        try:
+            sm = re.search(r"^- stage type:\s*`?([\w-]+)", (proj / ".work" / "briefs" / f"{brief}.md").read_text(), re.M)
+            stage_type = sm.group(1) if sm else "other"
+        except OSError:
+            pass
+    if isinstance(tokens, (int, float)) and tokens > 0:
+        sys.path.insert(0, str(DOTCLAUDE / "scripts"))
+        import budgets
+        budgets.log(proj, stage_type, brief, role, int(tokens), inp.get("session_id", "-"))
+    st = load_status(inp)
+    used = context_tokens(st)
+    if used is not None and used >= context_threshold(st):
+        emit({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext":
+              f"Context threshold reached ({used // 1000}k tokens in context, threshold {context_threshold(st) // 1000}k). "
+              "Do not start another dispatch or review round. Finish the bookkeeping of the current round "
+              "(reports committed, review log row, review_status.py), then run /handoff with outcome `context`. "
+              "bin/rw starts a fresh session that resumes from the files."}})
+
+
+def reset_time(st):
+    rl = st.get("rate_limits") or {}
+    full = [w for w in rl.values() if isinstance(w, dict) and float(w.get("used_percentage") or 0) >= 99]
+    pool = full or [w for k, w in rl.items() if k == "five_hour" and isinstance(w, dict)]
+    times = [int(w["resets_at"]) for w in pool if w.get("resets_at")]
+    return max(times) if times else None
+
+
+def stop_failure(inp, proj):
+    if inp.get("error") != "rate_limit":
+        return
+    snap = write_snapshot(inp, proj, "usage limit") if unrecorded_work(inp, proj) else None
+    resets = reset_time(load_status(inp))
+    data = {"run": os.environ.get("RW_RUN", "manual"), "outcome": "limit", "reason": "subscription usage limit",
+            "resets_at": resets, "snapshot": snap.name if snap else None,
+            "time": datetime.now().isoformat(timespec="seconds"), "stopped": True}
+    p = proj / ".work" / ".rw" / "end.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(data) + "\n")
+    when = datetime.fromtimestamp(resets).strftime("%H:%M") if resets else "the reset"
+    notify(f"rw: usage limit in {proj.name}", f"Paused. Resumes after {when}.")
+
+
+def statusline(inp):
+    """Print the status line and cache the input for the other hooks. Runs in every project."""
+    try:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        status_cache_path(inp).write_text(json.dumps(inp))
+    except OSError:
+        pass
+    cw = inp.get("context_window") or {}
+    pct = cw.get("used_percentage")
+    model = (inp.get("model") or {}).get("display_name") or ""
+    parts = [model] if model else []
+    parts.append(f"ctx {int(float(pct))}%" if pct is not None else "ctx -")
+    proj = project_dir(inp)
+    st = proj / ".work" / "state.md"
+    if st.is_file():
+        m = re.search(r"^- stage:\s*(.+)$", st.read_text(), re.M)
+        if m:
+            parts.append(m.group(1).strip()[:40])
+    print(" | ".join(parts))
 
 
 EVENTS = {"session-start": session_start, "prompt": prompt, "pre-compact": pre_compact,
-          "stop": stop, "pre-tool-use": pre_tool_use}
+          "stop": stop, "pre-tool-use": pre_tool_use, "ask": ask, "post-agent": post_agent,
+          "stop-failure": stop_failure, "statusline": statusline}
 
 
 def main():
@@ -219,6 +443,9 @@ def main():
         return 0
     try:
         inp = json.loads(sys.stdin.read() or "{}")
+        if sys.argv[1] == "statusline":
+            statusline(inp)
+            return 0
         proj = project_dir(inp)
         if not (proj / ".work").is_dir():
             return 0

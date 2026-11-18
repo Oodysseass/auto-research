@@ -13,11 +13,13 @@ All state lives in `.work/`. Read these before any work:
 - `.work/model.md`: model and assumptions (A-IDs). Binding.
 - `.work/glossary.md`: terms, macros, notation. Wins over global glossaries.
 - `.work/claims.md`: claim registry. Never state a claim stronger than its status.
-- `.work/state.md`: current stage, next actions, open approvals.
-- `.work/approvals.md`: what needs my approval.
+- `.work/state.md`: current stage, next actions, pending decisions, requeued briefs.
+- `.work/approvals.md`: the class of every question to me (blocking, checkpoint, logged).
+- `.work/decisions/`: one card per question to me. `.work/packets/`: approval packets.
 - `.work/briefs/`, `.work/issues/`, `.work/handoffs/`, `.work/decisions.md`, `.work/deadends.md`.
 
-Start a session with `rw` from the project root (runs `/orch` on the orchestrator tier). End it with `/handoff`.
+Run `rw` from the project root. It loops: one orchestrator session per stage, each with fresh context, asking me inside the
+session and notifying me when my input is needed. `/why <ID>` explains any claim, assumption, decision or issue.
 
 ## Build
 

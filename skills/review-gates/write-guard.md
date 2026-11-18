@@ -24,5 +24,7 @@ and every arbiter dispatch. For an arbiter, "reviewer" below means the arbiter.
    3. Check that `git status --porcelain` prints nothing.
    4. Discard the review. Its issues do not count toward any round, and the round is rerun.
    5. Append to `decisions.md`: date, `made by: orchestrator`, "reviewer write violation", the reviewer, model, round, the paths it touched, and "review discarded, changes reverted".
-   6. A second violation by the same reviewer on the same artifact: escalate to the human. This is not a review deadlock and is not arbitrated.
+   6. A second violation by the same reviewer on the same artifact: rerun once at the next rung of its ladder (logged).
+      A third: `/handoff error`. This is not a review deadlock and is not arbitrated, and it is not a research question for the human.
 5. On no violation: validate the report with `scripts/validate_issue_json.py`, then commit the new files.
+   Commit message per the `commit-style` skill: "review <artifact>, round <n>". No reviewer or model name.

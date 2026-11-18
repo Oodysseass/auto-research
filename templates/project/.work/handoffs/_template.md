@@ -12,9 +12,17 @@ File name: `handoffs/<YYYYMMDD-HHMM>.md`. Written by `/handoff` at the end of ev
 - Commits: <hashes>
 - Claims: <C-IDs with old and new status>
 
+## Decisions
+
+- <D-IDs asked, answered, provisional or reversed this session | none>
+
 ## Open issues
 
 - <issue ID, severity, artifact | none>
+
+## Outcome
+
+<stage-done | context | project-done | error>: <one line>
 
 ## Next step
 

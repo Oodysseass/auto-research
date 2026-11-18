@@ -35,7 +35,7 @@ Exit codes: 0 written; 2 refused (contract, dirty tree, auth, arguments); 3 Code
 
 ## After the script
 
-- Exit 0: commit the report, then treat it like any other review (review-gates skill). Codex IDs are stable across rounds:
+- Exit 0: commit the report (message per the `commit-style` skill: "review <artifact>, round <n>"), then treat it like any other review (review-gates skill). Codex IDs are stable across rounds:
   the script passes the previous round's report to Codex.
-- Exit 3: log "reviewer write violation" in `decisions.md` (write-guard step 4.5). A second violation on the same artifact goes to the human (write-guard step 4.6); it is not arbitrated.
-- Exit 4 or 5: log it and escalate to the human. Do not substitute a Claude reviewer for G3.
+- Exit 3: log "reviewer write violation" in `decisions.md` (write-guard step 4.5). A second violation follows write-guard step 4.6; it is not arbitrated.
+- Exit 4 or 5: log it (`class: logged`) and retry once. A second failure: `/handoff error` with the exit code. Do not substitute a Claude reviewer for G3.

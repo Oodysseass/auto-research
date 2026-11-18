@@ -20,13 +20,18 @@ Intake runs in the main session. It produces no paper content and dispatches no 
 3. If `.work/` exists, stop and ask. Intake never overwrites `.work/`. Migration of existing projects follows prompt 03.
 4. If a framing argument was given, append it verbatim to `resources/BRIEF.md` under a heading `## Addendum <YYYY-MM-DD>`.
    It is part of the project brief from then on.
-5. Scaffold `.work/` from `~/dotclaude/templates/project/.work/` and the project `CLAUDE.md` from `~/dotclaude/templates/project/CLAUDE.md`.
-   Never overwrite an existing project `CLAUDE.md`; propose a diff instead.
+5. Scaffold `.work/` from `~/dotclaude/templates/project/.work/` (including `decisions/` and `packets/`), the project `CLAUDE.md`
+   from `~/dotclaude/templates/project/CLAUDE.md`, and `.gitignore` from `~/dotclaude/templates/project/.gitignore`
+   (append its lines if one exists). Never overwrite an existing project `CLAUDE.md`; propose a diff instead.
 6. Classify the project. Use the table below. If two types fit, or the signals are weak, ask.
+
+Asking, everywhere in intake: AskUserQuestion, at most 4 questions per call, recommended option first with "(Recommended)" and a one-line
+reason in its description. Research content, scope and direction only: never tokens, budgets, model tiers, effort or file formats.
+Never end the session to ask.
 7. Check the project brief against the SoW, if there is one. The SoW governs scope; the project brief governs approach.
    List every conflict between them (an item the brief excludes that the SoW requires, a priority the SoW rules out, a deliverable format
    that differs). Ask the human to resolve each one. Do not resolve it yourself. Add each answer to the project brief under the dated heading.
-8. Ask the human, in one message, everything you cannot determine from `resources/`. Typical gaps: client or venue, format,
+8. Ask the human, in as few dialogs as possible, everything you cannot determine from `resources/`. Typical gaps: client or venue, format,
    deadlines, scope boundaries, which results count as main, whether `codex` is allowed. Do not guess. Answers go into the project brief
    under the dated heading, so that every requirement has a line to point to.
 9. Write `.work/contract.md`. Every requirement gets an R-ID whose source is a line of `resources/BRIEF.md` or of the SoW
@@ -35,11 +40,15 @@ Intake runs in the main session. It produces no paper content and dispatches no 
    into a row of the contract's `## G1 checks` table, with its source line. The conformance reviewer checks every row at G1.
    Mark main theorems or headline results in the question or requirements, so routing can find them.
    Copy `ai_tools_allowed` from the brief's Constraints (client); default `claude, codex`.
-10. Leave `.work/approvals.md` at its defaults unless the human says otherwise.
+10. Leave `.work/approvals.md` (Class table) at its defaults unless the human says otherwise.
 11. Pick the playbook (same name as the type unless the human says otherwise). Copy its stage list into `state.md` as next actions; set stage 1.
 12. Fill `.work/glossary.md` with terms and macros found in `resources/` (existing `.tex` macros, SoW terms). Leave `model.md` to the modeler.
-13. Append to `decisions.md`: the classification and playbook, with a one-line reason. Commit on a new branch `work/intake`.
-14. Stop. Show the contract and the playbook stages, and ask for approval. Record the answer in `approvals.md` (Log) and in the contract's Approval section.
+13. Append to `decisions.md`: the classification and playbook, with a one-line reason (`class: blocking`, card `D1`).
+    Commit on a new branch `work/intake`, message per the `commit-style` skill ("add contract and playbook").
+14. Approval (blocking): write card `D1` ("Approve the contract and the playbook stages?"; options approve / change scope / change
+    playbook). Show the contract and the playbook stages in chat, then ask with `decisions.py compress D1`.
+    Record the answer: `decisions.py accept D1 --option <x>`, a line in `approvals.md` (Log) with the commit, and the contract's
+    Approval section. Commit ("approve contract"). Then tell the human: run `rw` to start the workflow.
 
 ## Classification
 
@@ -67,6 +76,7 @@ The orchestrator turns one stage into one or more briefs from `.work/briefs/_tem
 - [open-ended](playbooks/open-ended.md)
 
 Common to all playbooks:
-- Approval points come from `approvals.md`, not from the playbook. A stage marked "G5" stops for approval only if `approvals.md` says `yes` for that event.
-- One stage per orchestrator session.
+- Approval points come from `approvals.md`, not from the playbook. A stage marked "G5" asks for approval with the class `approvals.md`
+  gives that event: `blocking` asks at once (with a packet), `checkpoint` proceeds provisionally and asks at the next checkpoint.
+- One stage per orchestrator session. `rw` starts the sessions in a loop.
 - A stage is done when every brief of the stage has converged at its gates. The orchestrator then advances `state.md`.

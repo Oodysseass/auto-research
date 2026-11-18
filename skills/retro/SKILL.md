@@ -17,6 +17,6 @@ Proposals only. Nothing in `~/dotclaude` changes without the human's approval of
    - evidence: the issue IDs or dead-end lines it comes from.
    The rules card has a hard budget of 15 lines. A rules-card proposal over budget must say which line it replaces.
    Domain knowledge stays general: no client names, no confidential details.
-4. Ask the human to approve or refuse each proposal by number. Apply only the approved ones in `~/dotclaude`,
-   then run `python3 ~/dotclaude/scripts/build_mythos_variants.py` if an agent file changed, and commit there.
+4. Ask the human with AskUserQuestion, one question per proposal (at most 4 per call): approve or refuse. Apply only the approved ones in `~/dotclaude`,
+   then run `python3 ~/dotclaude/scripts/build_mythos_variants.py` if an agent file changed, and commit there per the `commit-style` skill.
 5. Append to the project's `decisions.md`: `retro`, the proposals approved and refused. Commit.

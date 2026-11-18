@@ -19,7 +19,7 @@ Gates run in this order. A gate runs only after the previous gate has converged.
 | G2 technical | `assumption-auditor`, then `proof-checker`, then `counterexample-hunter`; `citation-verifier` for artifacts with citations | definitions, statements, proofs, designs, findings |
 | G3 cross-model | Codex, via the codex-review skill | critical artifacts (below) |
 | G4 style | `style-reviewer` | prose and LaTeX after G1 to G3 converge |
-| G5 human | the human, per `.work/approvals.md` | events marked `yes` there |
+| G5 human | the human, per `.work/approvals.md` | blocking and checkpoint events there, as decision cards |
 
 G1 runs before G2 so that a correct proof of the wrong statement, or in the wrong model, is caught before technical review is spent on it.
 Inside G2, `proof-checker` runs only after `assumption-auditor` converges, and `counterexample-hunter` only after `proof-checker` converges.
@@ -38,7 +38,7 @@ Never pass producer reasoning, drafts or chat.
 - Schema: `~/dotclaude/schemas/issue-report.schema.json`. Producer responses: `issue-response.schema.json`.
 - File names and stable IDs: `.work/issues/README.md` in the project.
 - Validate every report: `python3 ~/dotclaude/scripts/validate_issue_json.py ~/dotclaude/schemas/issue-report.schema.json <file>`.
-  An invalid report does not count; rerun the reviewer once, then escalate to the human.
+  An invalid report does not count; rerun the reviewer once (logged), then `/handoff error`. Never a question to the human.
 - Duplicates across reviewers: the orchestrator sets `duplicate_of` on the later issue (README, "Duplicates").
 
 ## Review loop
@@ -48,7 +48,7 @@ A clean round is a round with zero blocking and zero major issues (minor issues 
 
 - Rebuttals: the producer may answer an issue with `rejected` and an argument. The rebuttal goes to the next round's reviewer,
   who keeps the issue (same ID) or drops it. The orchestrator never resolves a rebuttal itself.
-- `needs_human`: the issue goes to "Open approvals" in `state.md`. The loop pauses for that issue.
+- `needs_human`: the producer could not settle the issue from the files. Escalate it as a decision card (below). The other issues go on.
 - Record each round in the brief's `## Review log` table (columns fixed by the brief template): round, gate, reviewer, model,
   commit, verdict, counts by severity, and the content hashes from `review_status.py .work/issues <slug> --hashes`.
   Content is the artifact files plus their review context: `model.md`, `glossary.md`, and the `claims.md` entries of the
@@ -59,7 +59,7 @@ A clean round is a round with zero blocking and zero major issues (minor issues 
 
 Check after every round, in this order, by running `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug>`.
 The script applies these rules to each gate reviewer, then gate, then the artifact, and prints a last line
-`overall: <status> -> <action> [gate reviewer issue]`. Never apply them by hand. If the script fails, escalate to the human.
+`overall: <status> -> <action> [gate reviewer issue]`. Never apply them by hand. If the script fails, `/handoff error`.
 
 1. Converged:
    - Non-critical artifact: one clean round of the gate.
@@ -70,9 +70,15 @@ The script applies these rules to each gate reviewer, then gate, then the artifa
 2. Deadlock: the producer rejects the same canonical issue twice, and the reviewer keeps it twice. Arbitrate (below).
    A deadlock reaches the human only after the arbiters, never before `arbiter` has ruled.
 3. Stalled: the producer's revision has no diff, or an artifact hash repeats an earlier round's hash. Escalate to the human.
-4. Round limit: 5 rounds per gate reviewer per artifact, or the brief's budget if smaller. Escalate to the human.
+4. Round limit: 5 rounds per gate reviewer per artifact, or the brief's `rounds` if smaller. Escalate to the human.
+5. Automatic budget (never a human decision): over the brief's `tokens` and the latest round raised new issue IDs: `extend-budget`,
+   once, by 50% (set `- extended: yes`, log it with `class: logged`). Over budget otherwise: `stalled -> human`, as rule 3.
 
-Escalating means: set the brief status to `escalated`, add the event to "Open approvals" in `state.md`, log it in `decisions.md`, stop the loop.
+Escalating means: set the brief status to `escalated`, write a decision card `.work/decisions/D<n>.md` (orch skill, "Asking the human")
+with the class from the Class table of `approvals.md`, and log it in `decisions.md`. The card asks the research question behind the stop
+(which reading of the model, which fix, whether to drop the claim), never about rounds or budgets. Its options come from the issue,
+the rebuttals and the rulings; recommend one. Checkpoint class: continue provisionally with the recommendation (the producer gets it
+as a brief revision). Blocking class: ask now, in the session. The session never ends to wait for an answer.
 
 ## Deadlock arbitration
 
@@ -84,7 +90,8 @@ Order: `arbiter`, then `arbiter-mythos` (if ruling 1 is `needs_human`, or the is
    and the ruling file name `.work/issues/<slug>.<gate>.<reviewer>.i<n>.ruling1.json`.
 2. Dispatch `arbiter-mythos` (ruling file `...ruling2.json`, plus the path of ruling 1) if ruling 1 is `needs_human`,
    or the issue concerns a main theorem. For a main theorem, ruling 2 governs, even when it differs from ruling 1.
-3. Escalate to the human only if the governing ruling is `needs_human`. Put its `human_question` in "Open approvals".
+3. Escalate to the human only if the governing ruling is `needs_human`. The card's question is the ruling's `human_question`;
+   blocking if the issue concerns a main theorem, checkpoint otherwise (the arbiter's best reading is the recommendation).
 4. Validate each ruling against `~/dotclaude/schemas/arbiter-ruling.schema.json`. Log each ruling in `decisions.md`.
 
 Effect of the governing ruling:

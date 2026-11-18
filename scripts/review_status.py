@@ -22,8 +22,13 @@ round limit) to each gate reviewer, then to each gate, then to the artifact.
 
 Prints one line per gate, `open issues: ...`, and a last line
   overall: <status> -> <action> [<gate> <reviewer>]
-status: converged | deadlocked | stalled | max_rounds | open
-action: none | run | next-gate | arbitrate | arbitrate-mythos | human
+status: converged | converged-provisional | deadlocked | stalled | max_rounds | open
+action: none | run | next-gate | extend-budget | arbitrate | arbitrate-mythos | human
+`converged-provisional`: converged, but a claim in scope (or a dependency) is `provisional` on a decision card:
+set it `provisional`, never `verified`, until the card is accepted.
+Budget: the brief's automatic `- tokens:` budget (model-routing, budgets.py) against the sum of its rows in
+.work/usage.tsv. Over budget and the latest review round raised new issue IDs: `extend-budget` (once, by 50%; then set
+`- extended: yes`). Over budget otherwise, or over the extended budget: `stalled -> human` under the stall rule.
 A deadlock gives `arbitrate`, then `arbitrate-mythos` (ruling 1 needs_human, or main theorem), and `human` only
 when the governing ruling is needs_human or the producer rejects again after reviewer_right.
 `open -> next-gate` means a critical artifact has one clean round of the gate and may move on:
@@ -407,6 +412,11 @@ def analyse(issues_dir, slug, brief=None):
         waiting = [g for g in gates if per_gate[g]["status"] != "converged"]
         overall = dict(per_gate[waiting[0]], gate=waiting[0]) if waiting else \
             {"status": "converged", "action": "none", "gate": None, "reviewer": None, "reason": "all gates converged"}
+    overall = apply_budget(ctx, gates, per_gate, overall, fields, briefs, root)
+    provisional = provisional_claims(root, split_list(fields.get("claims")))
+    if overall["status"] == "converged" and provisional:
+        overall = dict(overall, status="converged-provisional",
+                       reason="all gates converged; provisional: " + ", ".join(f"{c} ({d})" for c, d in provisional))
     counts = {"blocking": 0, "major": 0, "minor": 0}
     seen = set()
     for streams in reports.values():
@@ -417,8 +427,83 @@ def analyse(issues_dir, slug, brief=None):
                 seen.add(cid)
                 counts[i["severity"]] += 1
     return {"artifact": slug, "briefs": [str(b) for b in briefs], "critical": critical, "main": main,
-            "budget": budget, "gates": per_gate, "open_issues": counts, "overall": overall,
+            "budget": budget, "gates": per_gate, "open_issues": counts, "overall": overall, "provisional": provisional,
+            "usage": token_usage(root, briefs), "token_budget": token_budget(fields),
             "warnings": warnings + ctx.warnings}
+
+
+# ---------- provisional claims and automatic budget ----------
+
+def provisional_claims(root, ids):
+    """[(C-ID, D-IDs)] for the claims in scope and their dependencies whose status is provisional."""
+    claims = parse_claims(Path(root) / ".work" / "claims.md")
+    out = []
+    for c in claim_closure(claims, ids):
+        e = claims.get(c, {})
+        if e.get("status") == "provisional":
+            out.append((c, e.get("provisional_on", "none")))
+    return out
+
+
+def parse_tokens(v):
+    m = re.match(r"^\s*(\d+(?:\.\d+)?)\s*([kKmM]?)", v or "")
+    if not m:
+        return None
+    return int(float(m.group(1)) * {"": 1, "k": 1000, "m": 1000000}[m.group(2).lower()])
+
+
+def token_budget(fields):
+    return parse_tokens(fields.get("tokens"))
+
+
+def token_usage(root, briefs):
+    """Sum of the usage.tsv rows of these briefs (column `brief` is the brief file stem)."""
+    p = Path(root) / ".work" / "usage.tsv"
+    stems = {Path(b).stem for b in briefs}
+    total = 0
+    if p.is_file():
+        for line in p.read_text().splitlines()[1:]:
+            cols = line.split("\t")
+            if len(cols) >= 6 and cols[3] in stems and cols[5].strip().isdigit():
+                total += int(cols[5])
+    return total
+
+
+def latest_stream(ctx, gates):
+    last = None
+    for g in gates:
+        for (gg, rv) in sorted(ctx.reports):
+            if gg == g:
+                last = (gg, rv)
+    return last
+
+
+def new_issues_in_latest_round(ctx, gates, overall):
+    key = (overall.get("gate"), overall.get("reviewer"))
+    if key not in ctx.reports:
+        key = latest_stream(ctx, gates)
+    if key is None:
+        return False
+    rounds = ctx.reports[key]
+    last = max(rounds)
+    earlier = {ctx.canonical(i["id"]) for r, rep in rounds.items() if r < last for i in rep.get("issues", [])}
+    return any(ctx.canonical(i["id"]) not in earlier for i in ctx.counted(rounds[last]))
+
+
+def apply_budget(ctx, gates, per_gate, overall, fields, briefs, root):
+    budget = token_budget(fields)
+    if budget is None or overall["status"] != "open" or overall["action"] not in ("run", "next-gate"):
+        return overall  # deadlocks, stalls, round limits and human actions keep their own path
+    extended = fields.get("extended", "no").lower().startswith("y")
+    limit = int(budget * 1.5) if extended else budget
+    used = token_usage(root, briefs)
+    if used <= limit:
+        return overall
+    if not extended and new_issues_in_latest_round(ctx, gates, overall):
+        return dict(overall, status="open", action="extend-budget",
+                    reason=f"over the automatic budget ({used} > {limit}) and the latest round raised new issues: extend once by 50%")
+    why = "over the extended budget" if extended else "over the automatic budget and the latest round raised no new issues"
+    return dict(overall, status="stalled", action="human", reason=f"{why} ({used} > {limit})")
 
 
 def main(argv=None):
@@ -455,6 +540,8 @@ def main(argv=None):
         print(f"{g} {s['status']} -> {s['action']}{who}: {s['reason']}")
     c = res["open_issues"]
     print(f"open issues: blocking {c['blocking']}, major {c['major']}, minor {c['minor']}")
+    if res["provisional"]:
+        print("provisional: " + ", ".join(f"{c} ({d})" for c, d in res["provisional"]))
     for w in res["warnings"]:
         print(f"warning: {w}")
     o = res["overall"]

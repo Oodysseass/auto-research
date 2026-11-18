@@ -86,6 +86,7 @@ or when the brief marks the task as hard. `prover` moves to `prover-mythos` when
 | citation-verifier | G2 | Sonnet, medium | `citation-verifier` -> `citation-verifier` with `model: opus, effort: medium` |
 | style-reviewer | G4 | Sonnet, medium | `style-reviewer`. No escalation; disputes go to the human |
 | regression-checker | none | Haiku, low | `regression-checker` -> `regression-checker` with `model: sonnet, effort: medium` |
+| summarizer | none (approval packets) | Sonnet, medium | `summarizer` -> `summarizer` with `model: opus, effort: medium` if `check_packet.py` fails twice |
 | Codex | G3 | `gpt-6.1-sol`, `high` | Critical artifacts: `--effort highest` (no ladder below it) |
 
 `counterexample-hunter` climbs on survival: after an accept with an empty `issues` list at one rung, the next round runs one rung up,
@@ -111,10 +112,18 @@ Deadlock as defined in the review-gates skill (same canonical issue rejected twi
 
 ## Budget
 
-- Every brief has a budget: max review rounds (at most 5, per the review-gates skill) and a rough token size.
-- Defaults when the brief does not say: T1 task 100k tokens, T2 task 300k, T3 task 800k; 5 rounds.
-- The orchestrator updates "Budget used" in `state.md` after each dispatch, from the token count the Agent tool reports.
-- Overrun of rounds or tokens: stop, set the brief status to `escalated`, and escalate to the human. Do not start another round.
+Budgets are never a human decision. They never appear in a question, card, packet or approval.
+
+- Automatic budget per stage type, for one brief: `python3 ~/dotclaude/scripts/budgets.py get <stage type>`.
+  Defaults: [budgets.default.json](budgets.default.json). Calibrated values: `budgets.json` next to it (git-ignored), rewritten by
+  `budgets.py recalibrate` from the usage logged in past runs (90th percentile of brief totals x 1.25, at least 3 briefs).
+  `rw` recalibrates when it starts.
+- The brief records `rounds` (at most 5), `tokens` (the automatic budget) and `extended`.
+- Usage is logged by the PostToolUse hook after every dispatch: `.work/usage.tsv` and `~/.claude/rw-usage.tsv`. Never by hand.
+- Overrun: `review_status.py` decides. New issues in the latest round: `extend-budget`, once by 50%, logged. Otherwise the loop is
+  stalled (review-gates rule 3). Round limits and stall detection are the real stops.
+- The only usage event that reaches the human is the subscription limit: `rw` pauses, notifies, and resumes after the reset.
+- Token usage reaches the human only in the checkpoint screen, as information.
 - A T3 dispatch needs no approval. It is logged like every routing choice.
 
 ## Logging
@@ -124,6 +133,8 @@ Every dispatch whose tier differs from the agent file default, and every T3 disp
 ```
 ## <YYYY-MM-DD> | route <claim or brief> to <agent> (<rung>)
 - made by: orchestrator
+- class: logged
+- card: none
 - reason: <one line, e.g. "survived counterexample-hunter at Opus rung, r3">
 - routing: <agent>, <model ID>, <effort>
 ```

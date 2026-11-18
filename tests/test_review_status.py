@@ -255,3 +255,111 @@ def test_human_only_after_the_arbiters(case):
             r1 = json.loads((FIX / case / ".work" / "issues" / f"lemma.{g}.{rv}.i{n}.ruling1.json").read_text())["ruling"]
             if r1 == "needs_human" or res["main"]:
                 assert 2 in rulings
+
+
+# Provisional claims and the automatic budget.
+
+import shutil  # noqa: E402
+
+
+def case_copy(tmp_path, case):
+    dst = tmp_path / case
+    shutil.copytree(FIX / case, dst)
+    return dst
+
+
+def set_claim(root, cid, **kv):
+    p = root / ".work" / "claims.md"
+    out, cur = [], None
+    for line in p.read_text().splitlines():
+        if line.startswith("## "):
+            cur = line[3:].strip()
+        if cur == cid:
+            for k, v in kv.items():
+                if line.startswith(f"- {k}:"):
+                    line = f"- {k}: {v}"
+        out.append(line)
+    p.write_text("\n".join(out) + "\n")
+
+
+def usage(root, brief, tokens):
+    (root / ".work" / "usage.tsv").write_text(
+        "time\tsession\tstage_type\tbrief\trole\ttokens\n" + f"t\ts\tproof-lemma\t{brief}\tprover\t{tokens}\n")
+
+
+def analyse_at(root):
+    return review_status.analyse(root / ".work" / "issues", "lemma")
+
+
+def test_provisional_dependency_gives_converged_provisional(tmp_path):
+    root = case_copy(tmp_path, "converged")
+    set_claim(root, "C2", status="provisional")
+    res = analyse_at(root)
+    assert res["overall"]["status"] == "converged-provisional"
+    assert res["overall"]["action"] == "none"
+    assert res["provisional"] and res["provisional"][0][0] == "C2"
+
+
+def test_provisional_unrelated_claim_is_ignored(tmp_path):
+    root = case_copy(tmp_path, "converged")
+    set_claim(root, "C3", status="provisional")
+    assert analyse_at(root)["overall"]["status"] == "converged"
+
+
+def test_status_change_to_provisional_is_not_an_edit(tmp_path):
+    root = case_copy(tmp_path, "converged")
+    before = review_status.content_hashes(root, review_status.parse_brief(root / ".work/briefs/S1-lemma.md")[0])
+    set_claim(root, "C1", status="provisional")
+    after = review_status.content_hashes(root, review_status.parse_brief(root / ".work/briefs/S1-lemma.md")[0])
+    assert before == after
+
+
+def test_under_budget_is_unchanged(tmp_path):
+    root = case_copy(tmp_path, "open")
+    usage(root, "S1-lemma", 50000)
+    o = analyse_at(root)["overall"]
+    assert (o["status"], o["action"]) == ("open", "run")
+
+
+def test_over_budget_with_new_issues_extends(tmp_path):
+    root = case_copy(tmp_path, "open")
+    usage(root, "S1-lemma", 150000)
+    o = analyse_at(root)["overall"]
+    assert (o["status"], o["action"]) == ("open", "extend-budget")
+
+
+def test_over_extended_budget_is_stalled(tmp_path):
+    root = case_copy(tmp_path, "open")
+    b = root / ".work/briefs/S1-lemma.md"
+    b.write_text(b.read_text().replace("- tokens: 100k", "- tokens: 100k\n- extended: yes"))
+    usage(root, "S1-lemma", 140000)
+    assert analyse_at(root)["overall"]["action"] == "run"  # 140k < 150k
+    usage(root, "S1-lemma", 160000)
+    o = analyse_at(root)["overall"]
+    assert (o["status"], o["action"]) == ("stalled", "human")
+
+
+def test_over_budget_without_new_issues_is_stalled(tmp_path):
+    root = case_copy(tmp_path, "open")
+    issues = root / ".work" / "issues"
+    r1 = json.loads((issues / "lemma.G1.conformance-reviewer.r1.json").read_text())
+    (issues / "lemma.G1.conformance-reviewer.r2.json").write_text(json.dumps(r1))
+    usage(root, "S1-lemma", 150000)
+    o = analyse_at(root)["overall"]
+    assert (o["status"], o["action"]) == ("stalled", "human")
+    assert "no new issues" in o["reason"]
+
+
+def test_budget_never_overrides_deadlock_or_convergence(tmp_path):
+    for case, status in (("deadlocked", "deadlocked"), ("converged", "converged")):
+        root = case_copy(tmp_path, case)
+        usage(root, "S1-lemma", 10 ** 7)
+        assert analyse_at(root)["overall"]["status"] == status
+
+
+def test_cli_prints_provisional_line(tmp_path):
+    root = case_copy(tmp_path, "converged")
+    set_claim(root, "C2", status="provisional", provisional_on="D1")
+    out = subprocess.run([sys.executable, str(ROOT / "scripts" / "review_status.py"), str(root / ".work/issues"), "lemma"],
+                         capture_output=True, text=True).stdout
+    assert "overall: converged-provisional -> none" in out

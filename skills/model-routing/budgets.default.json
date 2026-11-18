@@ -1,0 +1,16 @@
+{
+  "_doc": "Default automatic token budget per stage type, for one brief. budgets.py recalibrate writes budgets.json next to this file from logged usage. Never shown to the human.",
+  "literature": 200000,
+  "refine": 800000,
+  "model": 300000,
+  "properties": 300000,
+  "statements": 300000,
+  "design": 800000,
+  "proof-lemma": 400000,
+  "proof-main": 1000000,
+  "attacks": 400000,
+  "exposition": 150000,
+  "report": 200000,
+  "review": 300000,
+  "other": 300000
+}
