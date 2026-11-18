@@ -8,6 +8,8 @@ Two repos per project (scripts/repos.py): the project repo, and .work/ as its ow
 The project may live in a subdirectory of the project repo; then hooks see only that subdirectory of it (repos.py).
 Notifications: $RW_NOTIFY_CMD <title> <message> if set, else osascript on macOS.
 bin/rw sets RW_LOOP=1 and RW_RUN=<id>; the Stop hook uses them to end a session after /handoff.
+Direct mode (no RW_LOOP): session-start reminds the session that typed prompts are requests (request skill); prompt saves
+each typed prompt for scripts/request.py and points to the skill, except `raw:` prompts (bypass) and `/` commands.
 Internal errors fail open: exit 0 with no output, so a bug never blocks a session.
 Stdlib only. Never reads or sets API keys.
 """
@@ -24,6 +26,7 @@ from pathlib import Path
 DOTCLAUDE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(DOTCLAUDE / "scripts"))
 import repos  # noqa: E402
+import request  # noqa: E402
 
 repos.TIMEOUT = 5
 RULES_CARD = DOTCLAUDE / "rules-card.md"
@@ -167,11 +170,34 @@ def emit(obj):
 
 # Events
 
+def direct_mode_notes(proj):
+    """Session-start lines for direct mode (a plain `claude` session, not under rw)."""
+    out = ["Direct mode: every prompt the human types is a request. Handle it with the `request` skill: record, assess, "
+           "execute with proportional gates, report, then wait. Exceptions: a prompt that starts with `raw:` (answer it "
+           "directly, outside the harness) or `/` (a command). Never continue into playbook stages unless asked; `rw` "
+           "is the autopilot."]
+    claude_md = next((p for p in (proj / "CLAUDE.md", proj / ".claude" / "CLAUDE.md") if p.is_file()), None)
+    if claude_md is None or "## Direct mode" not in claude_md.read_text():
+        out.append("This project predates direct mode. Before the first request, run "
+                   "`python3 ~/dotclaude/scripts/project_update.py` (one-time, idempotent) and commit its .work changes.")
+    try:
+        reqs = re.findall(r"^## (RQ\d+)\s*\n(?:- .*\n)*?- status: (open|deferred)\s*$",
+                          (proj / ".work" / "requests.md").read_text(), re.M)
+    except OSError:
+        reqs = []
+    if reqs:
+        out.append("Requests not finished: " + ", ".join(f"{r} ({s})" for r, s in reqs) +
+                   " (`python3 ~/dotclaude/scripts/request.py list`).")
+    return out
+
+
 def session_start(inp, proj):
     if load_baseline(inp) is None or inp.get("source") in ("startup", "clear"):
         save_baseline(inp, proj)
     parts = ["Research workflow project (.work/ present). Binding: .work/contract.md, model.md, glossary.md, claims.md, "
              "resources/BRIEF.md. Follow ~/.claude/rules-card.md."]
+    if not os.environ.get("RW_LOOP"):
+        parts += direct_mode_notes(proj)
     if inp.get("source") == "compact":
         parts.append("Context was just compacted. Before any other work: if this session changed .work/ or committed, "
                      "run /handoff now. Then re-read .work/contract.md, model.md and glossary.md before producing anything.")
@@ -185,8 +211,23 @@ def session_start(inp, proj):
 
 
 def prompt(inp, proj):
-    card = RULES_CARD.read_text()
-    emit({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": card}})
+    ctx = RULES_CARD.read_text()
+    text = str(inp.get("prompt") or "").lstrip()
+    if not os.environ.get("RW_LOOP") and text:
+        if text.lower().startswith("raw:"):
+            ctx += ("\nraw: prompt. Answer it directly, outside the harness: do not load the request skill, record "
+                    "nothing in resources/ or .work/, dispatch no agents, run no gates, commit nothing unless asked.\n")
+        elif not text.startswith("/"):
+            sid = request.session_key(inp.get("session_id"))
+            p = request.saved_prompt_path(sid)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(json.dumps({"prompt": inp.get("prompt"), "transcript": inp.get("transcript_path"),
+                                     "time": datetime.now().isoformat(timespec="seconds")}))
+            ctx += ("\nDirect mode: this prompt is a request. Load the `request` skill now and follow it. Step 1, before "
+                    "anything else: `python3 ~/dotclaude/scripts/request.py record --session " + sid +
+                    " --slug <slug> --title \"<title>\"` (add `--follow-up RQ<n>` if it only continues the request in "
+                    "progress).\n")
+    emit({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": ctx}})
 
 
 def write_snapshot(inp, proj, why):
@@ -285,7 +326,8 @@ def stop(inp, proj):
     if pending:
         emit({"decision": "block", "reason":
               f"Research workflow: this session made {describe(*pending)}, but .work/state.md is unchanged since the "
-              "session started. Run /handoff before stopping."})
+              "session started. Run /handoff before stopping (in direct mode: finish the request's report step, which "
+              "updates state.md)."})
         return
     end = end_marker(proj)
     if this_run(end):

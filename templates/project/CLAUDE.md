@@ -22,7 +22,15 @@ All state lives in `.work/`, its own local git repo. The project repo never trac
 - `.work/resources.manifest`: every file seen in `resources/`, which is append-only. New files are processed at session start.
 
 Run `rw` from the project root (the directory that contains `.work/`). It loops: one orchestrator session per stage, each with fresh context, asking me inside the
-session and notifying me when my input is needed. `/why <ID>` explains any claim, assumption, decision or issue.
+session and notifying me when my input is needed. `/why <ID>` explains any claim, assumption, decision, issue or request.
+
+## Direct mode
+
+In a plain `claude` session here, every prompt I type is a request, handled by the `request` skill, unless it starts with
+`raw:` (answered directly, outside the harness) or `/` (a command). The skill records the request in `resources/BRIEF.md`
+(attachments in `resources/<date>-<slug>/`, listed in the manifest), checks it against the contract, model and claims,
+does it with gates proportional to what it touches ("quick" or "full review" in the prompt overrides), reports a short
+packet, commits in both repos and waits. It never continues into playbook stages unless I ask. Registry: `.work/requests.md`.
 
 ## Build
 

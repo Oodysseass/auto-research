@@ -54,6 +54,9 @@ A workflow project has two repos (`~/dotclaude/scripts/repos.py`). Each commit g
 | decision recorded | .work | `decide adversary chain knowledge` |
 | approval recorded | .work | `approve model` |
 | new inputs recorded | .work | `record new inputs` |
+| request recorded (direct mode) | .work | `record request on lemma 2 wording` |
+| request done | .work | `update project state after lemma 2 wording` |
+| one-time project update | .work | `add request registry` |
 | handoff | .work | `update project state after proofs` |
 
 Use the artifact's plain name (from the brief's goal), e.g. "proof of lemma 2", "model".

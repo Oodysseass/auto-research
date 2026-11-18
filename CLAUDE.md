@@ -22,7 +22,8 @@ If no `resources/` folder exists, say so and ask whether one should be created, 
 proceeding from general knowledge of the area.
 
 If the project has a `.work/` folder, its `contract.md`, `model.md`, `glossary.md` and
-`claims.md` are binding. Follow `~/.claude/rules-card.md`.
+`claims.md` are binding. Follow `~/.claude/rules-card.md`. In a plain session there, every prompt is a
+request handled by the `request` skill, unless it starts with `raw:`; `rw` is the autopilot.
 
 ## Writing and LaTeX
 

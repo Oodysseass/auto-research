@@ -137,7 +137,9 @@ context; every turn re-reads the whole context, so cost per turn grows with it; 
         with the recommended option. Blocking: ask now.
    6. On convergence: update `claims.md` (`checked`, `verified` with `verified_by`, or for `converged-provisional` keep `provisional` and
       set `base_status` to what the gates earned), set the brief to `done`. Commit.
-8. Stage end, in this order: if the stage has an approval (G5), the summarizer packet, shown in chat; then the checkpoint (above),
+8. Deferred requests (`python3 ~/dotclaude/scripts/request.py list --status deferred`): run each through the request skill,
+   steps 2 to 4 (no record, no wait), before the stage-end steps below. Briefs written for a request carry `- request: RQ<n>`.
+9. Stage end, in this order: if the stage has an approval (G5), the summarizer packet, shown in chat; then the checkpoint (above),
    which includes a checkpoint-class approval card; then a blocking approval card, if any. Then `/handoff stage-done`.
    Before any handoff, update `state.md`.
 

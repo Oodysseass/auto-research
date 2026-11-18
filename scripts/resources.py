@@ -25,8 +25,8 @@ Usage (run from the project root, or pass --root):
                                       accept the current content of a file the workflow itself changed (a dated addendum to
                                       resources/BRIEF.md), or that the human asked to re-extract. Replaces its entry.
 
-Manifest columns (tab-separated): path, sha256, size, seen (YYYY-MM-DD), origin (intake | new | produced | refreshed),
-handled (- | recorded | D<n>), anomaly (- | edited <sha256 prefix> <date> | deleted <date>), summary.
+Manifest columns (tab-separated): path, sha256, size, seen (YYYY-MM-DD), origin (intake | new | produced | refreshed |
+request), handled (- | recorded | D<n> | RQ<n>; request files are written by request.py), anomaly (- | edited <sha256 prefix> <date> | deleted <date>), summary.
 Hidden files (names starting with ".") are ignored. Exit 0 on success, 1 on a failed card lint, 2 on usage errors.
 """
 import argparse

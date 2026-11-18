@@ -21,6 +21,7 @@ system (tokens, budgets, model tiers, effort levels, review round counts, file f
 |---|---|
 | Contract and playbook | blocking |
 | Any change to the contract or the scope after approval | blocking |
+| A request that changes the scope or a deliverable | blocking |
 | New input in `resources/` that changes scope or is a new SoW version | blocking |
 | Main theorem statements, before proving starts | blocking |
 | Each milestone or final deliverable | blocking |
@@ -37,6 +38,7 @@ system (tokens, budgets, model tiers, effort levels, review round counts, file f
 | Retries and reruns | logged |
 | Budget extensions | logged |
 | Minor fixes | logged |
+| A request that touches neither the contract, the model nor a statement | logged |
 | New input in `resources/` that does not bear on the contract (recorded) | logged |
 
 ## Log
