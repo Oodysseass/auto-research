@@ -4,6 +4,9 @@ from pathlib import Path
 
 import pytest
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+import repos  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 REPOS = ROOT / "scripts" / "repos.py"
 WORKFLOW_FILES = [".work/claims.md", ".work/state.md", ".work/issues/README.md", "CLAUDE.md", ".claude/settings.json",
@@ -144,3 +147,14 @@ def test_rev_diff_and_log_cover_both_repos(proj):
     log = run(proj, "log", base).stdout
     assert "project" in log and "add proof of lemma 1" in log and "work" in log and "register lemma statements" in log
     assert run(proj, "rev").stdout.strip() != base
+
+
+def test_normalize_exclude():
+    n = repos.normalize_exclude
+    assert n("a/.work/") == "/a/.work/"
+    assert n("/a/.work/") == "/a/.work/"
+    assert n("a/**/output/") == "/a/**/output/"
+    assert n("output/") == "output/"  # only a trailing slash: matches at any depth, not anchored
+    assert n("CLAUDE.md") == "CLAUDE.md"
+    assert n("# a/b") == "# a/b"
+    assert n("  a/b  ") == "/a/b"

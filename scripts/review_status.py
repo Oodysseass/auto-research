@@ -7,6 +7,12 @@ Usage:
 Gates and G2 reviewers come from the brief's `- gates:` field, e.g. `G0, G1, G2[assumption-auditor], G3`
 (default: G1, G2 with all three G2 reviewers, G3 if critical), plus any gate that has reports.
 
+  review_status.py <issues-dir> --all [--json]
+      Open issues of the whole directory: one line per artifact slug (counts as in the per-artifact report), one line
+      per legacy file (`legacy*.json`, e.g. legacy-open.json from a migration), and a total `open issues:` line.
+      An issue counts unless a producer_right ruling closed it, it is a duplicate, or its optional `status` is
+      `closed`. A missing `status` means open.
+
   review_status.py <issues-dir> <artifact-slug> --hashes
       Prints the Review log `hashes` cell for the current content: each file in the brief's
       `- artifact files:` field, .work/model.md, .work/glossary.md, and `claims`, a hash of the
@@ -55,6 +61,14 @@ DEFAULT_REVIEWERS = {
 }
 MAX_ROUNDS = 5
 BAD = ("blocking", "major")
+SEVERITIES = ("blocking", "major", "minor")
+REPORT_NAME = re.compile(r"^(.+)\.(G[0-5])\.([a-z0-9-]+)\.r(\d+)\.json$")
+LEGACY_NAME = re.compile(r"^legacy[\w.-]*\.json$")
+
+
+def issue_open(i):
+    """An issue is open unless its optional `status` says closed. A missing status means open (legacy files)."""
+    return str(i.get("status") or "open").strip().lower() != "closed"
 
 
 # ---------- loading ----------
@@ -264,7 +278,7 @@ class Ctx:
 
     def counted(self, rep):
         """Issues of a report that count: not closed by a producer_right ruling."""
-        return [i for i in rep.get("issues", []) if not self.closed(i["id"])]
+        return [i for i in rep.get("issues", []) if issue_open(i) and not self.closed(i["id"])]
 
     def is_clean(self, rep):
         return not any(i["severity"] in BAD for i in self.counted(rep))
@@ -518,16 +532,55 @@ def apply_budget(ctx, gates, per_gate, overall, fields, briefs, root):
     return dict(overall, status="stalled", action="human", reason=f"{why} ({used} > {limit})")
 
 
+def artifact_slugs(issues_dir):
+    return sorted({m.group(1) for p in Path(issues_dir).iterdir() if (m := REPORT_NAME.match(p.name))})
+
+
+def legacy_files(issues_dir):
+    return sorted(p for p in Path(issues_dir).iterdir()
+                  if LEGACY_NAME.match(p.name) and not p.name.endswith(".response.json"))
+
+
+def open_issues_all(issues_dir):
+    """{"per": {slug or legacy file name: counts}, "total": counts} over the whole issues directory."""
+    per = {slug: analyse(issues_dir, slug)["open_issues"] for slug in artifact_slugs(issues_dir)}
+    for p in legacy_files(issues_dir):
+        c = dict.fromkeys(SEVERITIES, 0)
+        for i in json.loads(p.read_text()).get("issues", []):
+            if issue_open(i) and not i.get("duplicate_of") and i.get("severity") in c:
+                c[i["severity"]] += 1
+        per[p.name] = c
+    total = {s: sum(c[s] for c in per.values()) for s in SEVERITIES}
+    return {"per": per, "total": total}
+
+
+def fmt_counts(c):
+    return f"blocking {c['blocking']}, major {c['major']}, minor {c['minor']}"
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("issues_dir")
-    ap.add_argument("slug")
+    ap.add_argument("slug", nargs="?")
+    ap.add_argument("--all", action="store_true", help="open issues of every artifact and legacy file in the directory")
     ap.add_argument("--brief")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--hashes", action="store_true", help="print the Review log `hashes` cell for the current content and exit")
     a = ap.parse_args(argv)
     if not Path(a.issues_dir).is_dir():
         print(f"review_status: {a.issues_dir} is not a directory", file=sys.stderr)
+        return 2
+    if a.all:
+        res = open_issues_all(a.issues_dir)
+        if a.json:
+            print(json.dumps(res, indent=2))
+            return 0
+        for name, c in res["per"].items():
+            print(f"{name}: {fmt_counts(c)}")
+        print(f"open issues: {fmt_counts(res['total'])}")
+        return 0
+    if not a.slug:
+        print("review_status: an artifact slug, or --all, is required", file=sys.stderr)
         return 2
     if a.hashes:
         briefs = [Path(a.brief)] if a.brief else find_briefs(a.issues_dir, a.slug)
@@ -551,7 +604,7 @@ def main(argv=None):
         who = f" {s['reviewer']}" if s.get("reviewer") else ""
         print(f"{g} {s['status']} -> {s['action']}{who}: {s['reason']}")
     c = res["open_issues"]
-    print(f"open issues: blocking {c['blocking']}, major {c['major']}, minor {c['minor']}")
+    print(f"open issues: {fmt_counts(c)}")
     if res["provisional"]:
         print("provisional: " + ", ".join(f"{c} ({d})" for c, d in res["provisional"]))
     for w in res["warnings"]:

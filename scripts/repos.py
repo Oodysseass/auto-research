@@ -203,10 +203,37 @@ def project_excludes(root):
     return lines, f"{EXCLUDE_HEADER}: {sub}"
 
 
+def normalize_exclude(line):
+    """Canonical form of an exclude line. Git anchors a pattern that has a slash before its last character to the
+    repo root whether or not it starts with one, so `a/.work/` and `/a/.work/` are the same pattern. Canonical: with
+    the leading slash. A pattern whose only slash is a trailing one (`output/`) matches at any depth and is unchanged."""
+    s = line.strip()
+    if not s or s.startswith("#") or s.startswith("/") or s.startswith("!"):
+        return s
+    return "/" + s if "/" in s.rstrip("/") else s
+
+
 def missing_excludes(root):
     f = exclude_file(root)
-    have = set(f.read_text().splitlines()) if f.is_file() else set()
-    return [e for e in project_excludes(root)[0] if e not in have]
+    have = {normalize_exclude(l) for l in f.read_text().splitlines()} if f.is_file() else set()
+    return [e for e in project_excludes(root)[0] if normalize_exclude(e) not in have]
+
+
+def normalize_excludes(f, wanted):
+    """Rewrite lines of the exclude file that equal a wanted line in another form (no leading slash) to the
+    wanted form. Returns the rewritten lines as (old, new)."""
+    if not f.is_file():
+        return []
+    canon = {normalize_exclude(w): w for w in wanted}
+    lines, changed = f.read_text().splitlines(), []
+    for k, l in enumerate(lines):
+        w = canon.get(normalize_exclude(l))
+        if w is not None and l != w:
+            changed.append((l, w))
+            lines[k] = w
+    if changed:
+        f.write_text("\n".join(lines) + "\n")
+    return changed
 
 
 def tracked(root):
@@ -243,6 +270,8 @@ def do_init(root):
     if top == (root / ".work").resolve() or ".work" in Path(sub).parts:
         raise UsageError(f"{root} is inside a .work repo, not a project root")
     msgs = []
+    for old, new in normalize_excludes(exclude_file(root), project_excludes(root)[0]):
+        msgs.append(f"normalized exclude line: {old} -> {new}")
     miss = missing_excludes(root)
     if miss:
         f = exclude_file(root)
@@ -278,9 +307,9 @@ def do_unexclude(root):
     f = exclude_file(root)
     lines, header = project_excludes(root)
     text = f.read_text() if f.is_file() else ""
-    drop = set(lines) | {header}
-    kept = [l for l in text.splitlines() if l not in drop]
-    removed = [l for l in text.splitlines() if l in set(lines)]
+    mine = {normalize_exclude(l) for l in lines}
+    kept = [l for l in text.splitlines() if l != header and normalize_exclude(l) not in mine]
+    removed = [l for l in text.splitlines() if normalize_exclude(l) in mine]
     if not removed and header not in text.splitlines():
         print("nothing to remove")
         return 0

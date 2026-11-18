@@ -84,6 +84,14 @@
             ],
             "pattern": "^G[0-5]/[a-z0-9-]+/[0-9]+$",
             "description": "Set by the orchestrator only. ID of the canonical issue this one duplicates. Resolving the canonical issue resolves this one."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ],
+            "description": "Optional. Set only in legacy files (legacy*.json) written by a migration. Missing means open."
           }
         }
       }

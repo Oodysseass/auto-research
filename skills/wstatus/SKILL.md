@@ -8,12 +8,15 @@ disable-model-invocation: true
 
 Read-only. Never edit or commit.
 
-1. Read `.work/state.md`, `.work/claims.md`, `.work/approvals.md` (Log), the latest handoff, and `python3 ~/dotclaude/scripts/decisions.py list`.
-2. Issues: for each artifact slug in `.work/issues/`, run `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug>`.
-   Its `open issues:` line counts open canonical issues by severity; sum them.
-3. Requests: `python3 ~/dotclaude/scripts/request.py list -n 5`.
-4. Repos: `python3 ~/dotclaude/scripts/repos.py check`. Resources: `python3 ~/dotclaude/scripts/resources.py scan` (without `--warn`).
-5. Reply as one short block:
+1. Run `python3 ~/dotclaude/scripts/wstatus.py` from the project root, as one Bash call and nothing else. It prints
+   every input below as `## <name>` sections: state, approvals log, latest handoff, decisions, issues, requests, repos,
+   resources. Never compose your own shell pipeline for these (in zsh, a separator such as `echo ====` fails as `=`
+   expansion and aborts the chain). A section that ends in `(exit N)` failed: report it as a fault, with its output.
+2. Issues: the `issues` section is `review_status.py --all`: one line per artifact slug, one per legacy file
+   (`legacy*.json`, issues without a `status` count as open), and the total `open issues:` line. For the per-artifact
+   status of a non-converged slug, run `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug>`.
+3. Read the latest handoff named in its section only if the state section does not say what is next.
+4. Reply as one short block:
    - stage: `<id> <name>`, active brief, branch, last handoff
    - issues: blocking / major / minor open, and per non-converged artifact its status (`open | deadlocked | stalled | max_rounds | converged-provisional`)
    - claims: count per status (`draft checked provisional verified refuted legacy-unverified`)

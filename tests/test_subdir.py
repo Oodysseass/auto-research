@@ -281,3 +281,37 @@ def test_rw_starts_in_subdir_and_points_to_projects(tmp_path, shared):
     r = subprocess.run([sys.executable, str(RW)], cwd=repo, env=env, capture_output=True, text=True, timeout=60,
                        stdin=subprocess.DEVNULL)
     assert r.returncode == 2 and f"projects below this directory: {THIS}, {SIBLING}" in r.stderr
+
+
+def test_check_accepts_exclude_lines_without_leading_slash(shared):
+    repo, this, sib = shared
+    f = repo / ".git" / "info" / "exclude"
+    lines = f.read_text().splitlines()
+    unslashed = [l[1:] if l.startswith(f"/{THIS}/") else l for l in lines]
+    assert unslashed != lines
+    f.write_text("\n".join(unslashed) + "\n")
+    # git honors both forms: the workflow files are still ignored
+    assert git(repo, "status", "--porcelain", "--untracked-files=all") == ""
+    r = run(this, "check")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "project repo excludes: ok" in r.stdout
+    # init writes the canonical form back, once, and adds nothing
+    r = run(this, "init")
+    assert r.returncode == 0, r.stderr
+    assert f"normalized exclude line: {THIS}/.work/ -> /{THIS}/.work/" in r.stdout
+    assert f.read_text().splitlines() == lines
+    assert run(this, "init").stdout.strip() == "already set up"
+    # unexclude removes either form
+    f.write_text("\n".join(unslashed) + "\n")
+    assert run(this, "unexclude").returncode == 0
+    assert not any(THIS in l for l in f.read_text().splitlines())
+
+
+def test_check_still_reports_a_narrower_output_line(shared):
+    repo, this, sib = shared
+    f = repo / ".git" / "info" / "exclude"
+    text = f.read_text().replace(f"/{THIS}/**/output/", f"{THIS}/output/")
+    f.write_text(text)
+    r = run(this, "check")
+    assert r.returncode == 1
+    assert f"MISSING /{THIS}/**/output/" in r.stdout

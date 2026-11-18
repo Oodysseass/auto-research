@@ -363,3 +363,67 @@ def test_cli_prints_provisional_line(tmp_path):
     out = subprocess.run([sys.executable, str(ROOT / "scripts" / "review_status.py"), str(root / ".work/issues"), "lemma"],
                          capture_output=True, text=True).stdout
     assert "overall: converged-provisional -> none" in out
+
+
+# Legacy issue files and the optional issue status.
+
+def legacy_issue(n, severity, **extra):
+    return dict({"id": f"G5/legacy/{n}", "severity": severity, "location": "x.tex", "claim": None,
+                 "evidence": "e", "suggested_fix": "f"}, **extra)
+
+
+def write_legacy(d, issues):
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "legacy-open.json").write_text(json.dumps(
+        {"gate": "G5", "reviewer": "legacy", "model": "none", "artifact": "a", "commit": "c", "issues": issues}))
+    (d / "README.md").write_text("# Issues\n")
+
+
+def test_all_counts_legacy_issues_without_status_as_open(tmp_path):
+    d = tmp_path / ".work" / "issues"
+    write_legacy(d, [legacy_issue(1, "major"), legacy_issue(2, "major"), legacy_issue(3, "minor")])
+    res = review_status.open_issues_all(d)
+    assert res["per"]["legacy-open.json"] == {"blocking": 0, "major": 2, "minor": 1}
+    assert res["total"] == {"blocking": 0, "major": 2, "minor": 1}
+
+
+def test_all_skips_closed_and_duplicate_legacy_issues(tmp_path):
+    d = tmp_path / ".work" / "issues"
+    write_legacy(d, [legacy_issue(1, "major", status="closed"), legacy_issue(2, "major", status="open"),
+                     legacy_issue(3, "major", duplicate_of="G5/legacy/2")])
+    assert review_status.open_issues_all(d)["total"] == {"blocking": 0, "major": 1, "minor": 0}
+
+
+def test_all_adds_artifact_reports_to_legacy_counts(tmp_path):
+    src = FIX / "critical-awaiting-g3"
+    d = tmp_path / "p" / ".work" / "issues"
+    subprocess.run(["cp", "-R", str(src), str(tmp_path / "p")], check=True)
+    per_artifact = review_status.analyse(d, "lemma")["open_issues"]
+    write_legacy(d, [legacy_issue(1, "blocking")])
+    res = review_status.open_issues_all(d)
+    assert res["per"]["lemma"] == per_artifact
+    assert res["total"]["blocking"] == per_artifact["blocking"] + 1
+
+
+def test_report_issue_with_closed_status_does_not_count(tmp_path):
+    src = FIX / "open"
+    subprocess.run(["cp", "-R", str(src), str(tmp_path / "p")], check=True)
+    d = tmp_path / "p" / ".work" / "issues"
+    before = review_status.analyse(d, "lemma")["open_issues"]
+    f = sorted(d.glob("lemma.*.r*.json"))
+    f = [p for p in f if not p.name.endswith(".response.json") and json.loads(p.read_text())["issues"]][-1]
+    rep = json.loads(f.read_text())
+    rep["issues"][0]["status"] = "closed"
+    f.write_text(json.dumps(rep))
+    after = review_status.analyse(d, "lemma")["open_issues"]
+    assert sum(after.values()) == sum(before.values()) - 1
+
+
+def test_cli_all(tmp_path):
+    d = tmp_path / ".work" / "issues"
+    write_legacy(d, [legacy_issue(1, "major")])
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "review_status.py"), str(d), "--all"],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.splitlines() == ["legacy-open.json: blocking 0, major 1, minor 0",
+                                     "open issues: blocking 0, major 1, minor 0"]
