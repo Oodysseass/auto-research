@@ -7,6 +7,10 @@ File name: `briefs/<id>.md`, with `<id>` = `<stage>-<short-slug>`, e.g. `S4-safe
 - assigned agent: <agent name>
 - model: <model ID>
 - effort: <low | medium | high | xhigh | max>
+- artifact slug: <slug used in .work/issues/ file names>
+- critical: <yes | no>  (main theorem, design, or final deliverable)
+- main theorem: <yes | no>
+- gates: <from the playbook stage, e.g. G0, G1, G2[assumption-auditor proof-checker], G3>
 
 ## Goal
 
@@ -37,3 +41,11 @@ Each criterion traces to requirement IDs (R-IDs) or claim IDs (C-IDs).
 - rounds: <max review rounds, at most 5>
 - tokens: <rough size, e.g. 200k>
 Overrun means stop and escalate to me.
+
+## Review log
+
+One row per review round. `hashes`: `<path>=<git hash-object>` per artifact file, `;`-separated.
+`review_status.py` reads this table: keep the columns.
+
+| round | gate | reviewer | model | commit | verdict | blocking | major | minor | hashes |
+|---|---|---|---|---|---|---|---|---|---|

@@ -1,0 +1,11 @@
+{
+  "producer": "prover",
+  "commit": "x2",
+  "responses": [
+    {
+      "issue_id": "G1/conformance-reviewer/2",
+      "status": "fixed",
+      "justification": "Because."
+    }
+  ]
+}

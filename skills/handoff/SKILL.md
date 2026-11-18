@@ -9,7 +9,7 @@ Run from the project root. Do it even if the session did little: the next orches
 
 1. Collect: commits since the last handoff (`git log --oneline <last handoff commit>..HEAD`, or the session's commits),
    changed files, claims whose status changed, open issues (`python3 ~/dotclaude/scripts/review_status.py .work/issues <slug>`
-   per artifact with reports; by hand per review-gates if the script does not exist yet), open approvals, budget used.
+   per artifact with reports), open approvals, budget used.
 2. Write `.work/handoffs/<YYYYMMDD-HHMM>.md` from `.work/handoffs/_template.md`. Every section filled; `none` where empty.
    "Must not forget" holds only what no other `.work/` file records.
 3. Update `.work/state.md`: `updated`, `stage`, `active brief`, `git branch`, `last handoff`, "Next actions", "Open approvals", "Budget used".

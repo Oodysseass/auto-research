@@ -1,0 +1,9 @@
+{
+  "gate": "G1",
+  "reviewer": "conformance-reviewer",
+  "model": "claude-opus-5-5",
+  "artifact": "paper/lemma.tex#lem.x",
+  "commit": "cb2",
+  "issues": [],
+  "verdict": "accept"
+}

@@ -1,0 +1,9 @@
+{
+  "gate": "G2",
+  "reviewer": "counterexample-hunter",
+  "model": "claude-opus-5-5",
+  "artifact": "paper/lemma.tex#lem.x",
+  "commit": "ca1",
+  "issues": [],
+  "verdict": "accept"
+}

@@ -14,7 +14,7 @@ Gates run in this order. A gate runs only after the previous gate has converged.
 
 | Gate | Reviewer | Runs on |
 |---|---|---|
-| G0 mechanical | `scripts/lint_tex.py` (Stage 6). No model. | every `.tex` change |
+| G0 mechanical | `python3 ~/dotclaude/scripts/lint_tex.py --artifact <path> --out <report> [--previous <last report>]`. No model. | every `.tex` change |
 | G1 conformance | `conformance-reviewer` | every artifact, before any technical review |
 | G2 technical | `assumption-auditor`, then `proof-checker`, then `counterexample-hunter`; `citation-verifier` for artifacts with citations | definitions, statements, proofs, designs, findings |
 | G3 cross-model | Codex, via the codex-review skill | critical artifacts (below) |
@@ -49,22 +49,25 @@ A clean round is a round with zero blocking and zero major issues (minor issues 
 - Rebuttals: the producer may answer an issue with `rejected` and an argument. The rebuttal goes to the next round's reviewer,
   who keeps the issue (same ID) or drops it. The orchestrator never resolves a rebuttal itself.
 - `needs_human`: the issue goes to "Open approvals" in `state.md`. The loop pauses for that issue.
-- Record each round in the brief under `## Review log`: round, gate, reviewer, model, commit, verdict,
-  counts by severity, and `git hash-object` of each artifact file.
+- Record each round in the brief's `## Review log` table (columns fixed by the brief template): round, gate, reviewer, model,
+  commit, verdict, counts by severity, and `git hash-object` of each artifact file. The hashes decide "same content" and "edit":
+  commits move with every report commit, so the rules below compare content by hash, not by commit.
 
 ## Stopping rules
 
-Check after every round, in this order. The orchestrator runs `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug>`,
-which applies these rules (setup Stage 6). Until it exists, apply them by hand and say so in `decisions.md`.
+Check after every round, in this order, by running `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug>`.
+The script applies these rules to each gate reviewer, then gate, then the artifact, and prints a last line
+`overall: <status> -> <action> [gate reviewer issue]`. Never apply them by hand. If the script fails, escalate to the human.
 
 1. Converged:
    - Non-critical artifact: one clean round of the gate.
    - Critical artifact: two consecutive clean rounds of the gate. For G1 and G2, a clean G3 round counts as the second round:
-     the gate converges when its first clean round and the clean G3 round are at the same commit, with no edit in between.
+     the gate converges when its first clean round and the clean G3 round are on the same content, with no edit in between.
+     After the first clean round of G1 or G2 the script prints `open -> next-gate`: run the next gate.
      G3 converges with one clean round. Any edit after a clean round voids it, and the gates rerun from G1.
 2. Deadlock: the producer rejects the same canonical issue twice, and the reviewer keeps it twice. Arbitrate (below).
 3. Stalled: the producer's revision has no diff, or an artifact hash repeats an earlier round's hash. Escalate to the human.
-4. Round limit: 5 rounds per gate per artifact, or the brief's budget if smaller. Escalate to the human.
+4. Round limit: 5 rounds per gate reviewer per artifact, or the brief's budget if smaller. Escalate to the human.
 
 Escalating means: set the brief status to `escalated`, add the event to "Open approvals" in `state.md`, log it in `decisions.md`, stop the loop.
 

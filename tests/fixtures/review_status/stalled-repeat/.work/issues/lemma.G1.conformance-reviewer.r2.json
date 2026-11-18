@@ -1,0 +1,18 @@
+{
+  "gate": "G1",
+  "reviewer": "conformance-reviewer",
+  "model": "claude-opus-5-5",
+  "artifact": "paper/lemma.tex#lem.x",
+  "commit": "cb2",
+  "issues": [
+    {
+      "id": "G1/conformance-reviewer/2",
+      "severity": "major",
+      "location": "paper/lemma.tex:1",
+      "claim": "C1",
+      "evidence": "Quoted text and why it fails.",
+      "suggested_fix": "One fix."
+    }
+  ],
+  "verdict": "revise"
+}

@@ -1,0 +1,19 @@
+{
+  "gate": "G3",
+  "reviewer": "codex",
+  "model": "claude-opus-5-5",
+  "artifact": "paper/lemma.tex#lem.x",
+  "commit": "ca1",
+  "issues": [
+    {
+      "id": "G3/codex/1",
+      "severity": "major",
+      "location": "paper/lemma.tex:1",
+      "claim": "C1",
+      "evidence": "Quoted text and why it fails.",
+      "suggested_fix": "One fix.",
+      "duplicate_of": "G2/proof-checker/1"
+    }
+  ],
+  "verdict": "revise"
+}
