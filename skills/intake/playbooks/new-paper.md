@@ -18,8 +18,8 @@ From a research question to a full paper in the venue format of the contract.
 
 ## S3 Refine question
 - goal: the question restated against the literature: what is new, what is known, what is open.
-- agent: orchestrator drafts (routing.md, open decision on a Mythos agent).
-- output: updated `contract.md` question; `decisions.md` entry.
+- agent: `question-refiner-mythos`; the orchestrator edits `contract.md` after approval.
+- output: proposal `notes/question/<brief-id>.md`; updated `contract.md` question; `decisions.md` entry.
 - acceptance: each "known" item cites a note; each "new" item is not in any note.
 - gates: G1, G5 (contract change).
 

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Arbiter ruling on a deadlocked issue",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["arbiter", "model", "commit", "artifact", "issue_id", "ruling", "reviewer_case", "producer_case", "reasoning", "required_change", "human_question"],
+  "properties": {
+    "arbiter": { "type": "string", "enum": ["arbiter"] },
+    "model": { "type": "string" },
+    "commit": { "type": "string" },
+    "artifact": { "type": "string" },
+    "issue_id": { "type": "string", "pattern": "^G[0-5]/[a-z0-9-]+/[0-9]+$" },
+    "ruling": { "type": "string", "enum": ["reviewer_right", "producer_right", "needs_human"] },
+    "reviewer_case": { "type": "string" },
+    "producer_case": { "type": "string" },
+    "reasoning": { "type": "string" },
+    "required_change": { "type": ["string", "null"] },
+    "human_question": { "type": ["string", "null"] }
+  }
+}

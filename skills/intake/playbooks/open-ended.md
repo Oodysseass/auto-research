@@ -14,7 +14,7 @@ Explore a direction without a fixed deliverable. Time-boxed rounds, each ending 
 - agent: chosen per round from routing.md (`literature-scout`, `attacker`, `prover`, `simulator`, ...).
 - output: round note `notes/rounds/<H-ID>-r<n>.md`.
 - acceptance: the round ends in exactly one of:
-  - promote: a new contract for a project of another type. Needs human approval.
+  - promote: a new contract for a project of another type, proposed by `question-refiner-mythos`. Needs human approval.
   - park: reason and what would reopen it, in the hypothesis log.
   - kill: one line in `deadends.md` with the reason.
 - gates: G1 on the round note; G2 (`counterexample-hunter`) on any claim the round promotes; G5 (promote).

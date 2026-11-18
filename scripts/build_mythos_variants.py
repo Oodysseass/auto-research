@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 AGENTS = Path(__file__).resolve().parent.parent / "agents"
-BASES = ["prover", "proof-checker", "counterexample-hunter", "attacker", "protocol-designer"]
+BASES = ["prover", "proof-checker", "counterexample-hunter", "attacker", "protocol-designer", "question-refiner", "arbiter"]
 MODEL = "claude-mythos-5-2"
 EFFORT = "xhigh"
 COPIED = ["tools", "disallowedTools", "skills"]

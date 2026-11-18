@@ -9,10 +9,12 @@ Run from the project root. The orchestrator runs it; agents never do.
 
 ```
 ${CLAUDE_SKILL_DIR}/codex_review.sh --artifact <path[#label]> --slug <slug> --round <n> --brief <.work/briefs/<id>.md> \
-    [--claims C1,C3] [--model <codex model>] [--effort <level>]
+    [--claims C1,C3] [--model <codex model>] [--effort <level>|highest]
 ```
 
-Defaults: model `$CODEX_REVIEW_MODEL` or `gpt-6.1-sol`; effort `$CODEX_REVIEW_EFFORT` or `high`. Log non-default choices per routing.md.
+Defaults: model `$CODEX_REVIEW_MODEL` or `gpt-6.1-sol`; effort `$CODEX_REVIEW_EFFORT` or `high`.
+Critical artifacts (main theorems, designs, final deliverables): `--effort highest`, which resolves to the highest level
+Codex lists for the model in `~/.codex/models_cache.json`. Routing per routing.md, section "Codex (G3)".
 
 ## What the script does
 

@@ -1,0 +1,11 @@
+#!/bin/sh
+# rw: start a fresh orchestrator session in the current project and run /orch.
+# Extra arguments go to claude before the prompt (e.g. rw --permission-mode plan).
+# The orchestrator tier is set on the next line only (see skills/model-routing/routing.md).
+RW_MODEL=claude-opus-5-5 RW_EFFORT=high
+
+if [ ! -f .work/state.md ]; then
+  echo "rw: no .work/state.md in $(pwd). cd to the project root, or run /intake first." >&2
+  exit 2
+fi
+exec claude --model "$RW_MODEL" --effort "$RW_EFFORT" "$@" "/orch"

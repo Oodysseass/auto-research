@@ -3,7 +3,8 @@
 #
 # Usage (from the project root):
 #   codex_review.sh --artifact <path[#label]> --slug <slug> --round <n> --brief <path>
-#                   [--claims C1,C3] [--model <codex model>] [--effort <level>]
+#                   [--claims C1,C3] [--model <codex model>] [--effort <level>|highest]
+#   --effort highest: the highest reasoning effort Codex lists for the model (G3 on critical artifacts).
 #
 # Exit codes: 0 report written; 2 refused; 3 Codex changed files (reverted, review discarded);
 #             4 invalid output twice; 5 codex exec failed.
@@ -34,7 +35,7 @@ while [ $# -gt 0 ]; do
     --claims)   CLAIMS="${2:-}"; shift 2 ;;
     --model)    MODEL="${2:-}"; shift 2 ;;
     --effort)   EFFORT="${2:-}"; shift 2 ;;
-    -h|--help)  sed -n '2,9p' "$0"; exit 0 ;;
+    -h|--help)  sed -n '2,10p' "$0"; exit 0 ;;
     *) die 2 "unknown argument: $1" ;;
   esac
 done
@@ -44,8 +45,22 @@ done
   || die 2 "--artifact, --slug, --round and --brief are required"
 [[ "$SLUG" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die 2 "slug must match [a-z0-9-]+: $SLUG"
 [[ "$ROUND" =~ ^[1-9][0-9]*$ ]] || die 2 "round must be a positive integer: $ROUND"
-[[ "$EFFORT" =~ ^(low|medium|high|xhigh|max)$ ]] || die 2 "effort must be low|medium|high|xhigh|max: $EFFORT"
 [[ "$MODEL" =~ ^[A-Za-z0-9._-]+$ ]] || die 2 "invalid model name: $MODEL"
+if [ "$EFFORT" = highest ]; then
+  # Highest level Codex lists for this model, from its model cache (refreshed by the CLI).
+  EFFORT="$(python3 -I - "${CODEX_HOME:-$HOME/.codex}/models_cache.json" "$MODEL" <<'PY'
+import json, sys
+try:
+    models = json.load(open(sys.argv[1]))["models"]
+    levels = next(m for m in models if m.get("slug") == sys.argv[2])["supported_reasoning_levels"]
+    print(levels[-1]["effort"])
+except (OSError, ValueError, KeyError, IndexError, StopIteration):
+    pass
+PY
+)"
+  [ -n "$EFFORT" ] || die 2 "cannot resolve --effort highest for $MODEL from the Codex model cache. Pass a level."
+fi
+[[ "$EFFORT" =~ ^[a-z]+$ ]] || die 2 "invalid effort: $EFFORT"
 [ -z "$CLAIMS" ] || [[ "$CLAIMS" =~ ^C[0-9]+(,C[0-9]+)*$ ]] || die 2 "claims must look like C1,C3: $CLAIMS"
 [ -f "${ARTIFACT%%#*}" ] || die 2 "artifact file not found: ${ARTIFACT%%#*}"
 [ -f "$BRIEF" ] || die 2 "brief not found: $BRIEF"
@@ -172,6 +187,7 @@ PY
 }
 
 # ---- Review, with one re-ask on invalid output ----
+echo "codex_review: model $MODEL, effort $EFFORT, artifact $ARTIFACT, round $ROUND" >&2
 for attempt in 1 2; do
   if [ "$attempt" = 1 ]; then
     prompt="$TMP/prompt.md"

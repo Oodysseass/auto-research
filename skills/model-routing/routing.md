@@ -1,11 +1,16 @@
 # Routing
 
-## Orchestrator
+## Where tiers are set
 
-- orchestrator: claude-opus-5-5, effort high
+Default tiers for Claude are set in two places. Per-call overrides (below) change a tier for one dispatch only.
 
-This line is the setting. Change it here to move the orchestrator to another model (e.g. `claude-mythos-5-2, effort xhigh`).
-`/orch` (Stage 5) applies it.
+- Orchestrator: the `RW_MODEL=... RW_EFFORT=...` line in `~/dotclaude/bin/rw` (default `claude-opus-5-5`, `high`).
+  `rw` starts `claude --model "$RW_MODEL" --effort "$RW_EFFORT" /orch`. A session started with plain `claude` runs on the global default instead.
+- Agents: the `model` and `effort` frontmatter of each base file in `~/dotclaude/agents/`.
+  The `-mythos` variants are generated: their tier is the `MODEL` and `EFFORT` constants in `scripts/build_mythos_variants.py`.
+  Edit the base file or the script, never a variant, then run the script.
+
+Codex tiers are set by the codex-review skill defaults and the flags below.
 
 ## How a tier is selected
 
@@ -35,9 +40,8 @@ A dispatch is the Agent tool call `subagent_type: <agent>`, with optional per-ca
 - Final proof check of headline results: `proof-checker-mythos`.
 - Attack search on a design or statement that survived T2 attacks: `attacker-mythos`, `counterexample-hunter-mythos`.
 - Hard protocol design: `protocol-designer-mythos`.
-- Research-question refinement after a literature review: no Mythos agent exists yet. Open decision, see the end of this file.
-- Resolving a deadlock before it reaches the human: rerun the deadlocked role at T3 when a `-mythos` variant exists
-  (the reviewer, the producer, or both). If no variant exists for either side, escalate to the human.
+- Research-question refinement after a literature review: `question-refiner-mythos`.
+- Resolving a deadlock before it reaches the human: `arbiter-mythos`, per the deadlock ladder below.
 
 "Main theorem" and "headline result" mean a claim the contract or the brief marks as main. The orchestrator marks it in the brief.
 
@@ -66,6 +70,7 @@ Each arrow is one rung. "human" means stop and escalate per `approvals.md`.
 | exposition-writer | Sonnet, high | `exposition-writer` -> `exposition-writer` with `model: opus, effort: high` |
 | report-writer | Sonnet, high | `report-writer` -> `report-writer` with `model: opus, effort: high` |
 | simulator | Sonnet, medium | `simulator` -> `simulator` with `model: opus, effort: high` |
+| question-refiner | Opus, high | Refinement stages start at `question-refiner-mythos`. `question-refiner` only when a brief says the refinement is minor |
 
 A producer moves up a rung when its output fails the same gate in two consecutive rounds on the same canonical issue,
 or when the brief marks the task as hard. `prover` moves to `prover-mythos` when a lemma proof fails G2 twice.
@@ -81,11 +86,28 @@ or when the brief marks the task as hard. `prover` moves to `prover-mythos` when
 | citation-verifier | G2 | Sonnet, medium | `citation-verifier` -> `citation-verifier` with `model: opus, effort: medium` |
 | style-reviewer | G4 | Sonnet, medium | `style-reviewer`. No escalation; disputes go to the human |
 | regression-checker | none | Haiku, low | `regression-checker` -> `regression-checker` with `model: sonnet, effort: medium` |
-| Codex | G3 | see codex-review skill | `codex_review.sh` with the default model -> `--effort` one level higher |
+| Codex | G3 | `gpt-6.1-sol`, `high` | Critical artifacts: `--effort highest` (no ladder below it) |
 
 `counterexample-hunter` climbs on survival: after an accept with an empty `issues` list at one rung, the next round runs one rung up,
 until the top rung that the claim's importance warrants (lemma: Opus rung; main theorem or design: Mythos rung).
 `regression-checker` moves up only if its output is inconsistent with `claims.md` dependencies.
+
+### Codex (G3)
+
+- Default: model `gpt-6.1-sol`, effort `high`.
+- Main theorems, designs and final deliverables (critical artifacts): the highest effort Codex lists for the model.
+  Pass `--effort highest`; the script reads the level from `~/.codex/models_cache.json` (for `gpt-6.1-sol`: `ultra`).
+- Other G3 runs a brief asks for: the default.
+
+### Deadlocks
+
+Deadlock as defined in the review-gates skill (same canonical issue rejected twice and kept twice).
+
+`arbiter` -> `arbiter-mythos` -> human.
+
+- Always start at `arbiter`.
+- Call `arbiter-mythos` if `arbiter` rules `needs_human`, or if the issue concerns a main theorem (then always, and its ruling governs).
+- Escalate to the human only if the governing ruling is `needs_human`.
 
 ## Budget
 
@@ -107,8 +129,3 @@ Every dispatch whose tier differs from the agent file default, and every T3 disp
 ```
 
 Default-tier dispatches are recorded in the brief header (`assigned agent`, `model`, `effort`) only.
-
-## Open decision
-
-No Mythos-tier agent covers research-question refinement after a literature review. Until one is added,
-the orchestrator drafts the refined question and stops for human approval.

@@ -1,7 +1,8 @@
 # Reviewer write guard
 
 Second layer of reviewer write enforcement. The first layer is the PreToolUse hook (Stage 5).
-The orchestrator runs this procedure around every reviewer dispatch (G1 to G4, any tier, and Codex at G3).
+The orchestrator runs this procedure around every reviewer dispatch (G1 to G4, any tier, and Codex at G3)
+and every arbiter dispatch. For an arbiter, "reviewer" below means the arbiter.
 
 ## Before dispatch
 
@@ -12,6 +13,7 @@ The orchestrator runs this procedure around every reviewer dispatch (G1 to G4, a
 
 1. Run `git status --porcelain --untracked-files=all`.
 2. Allowed: new untracked files under `.work/issues/` whose names start with `<artifact-slug>.<gate>.<reviewer>.r<round>`.
+   For an arbiter: only the ruling file named in its prompt, `<artifact-slug>.<gate>.<reviewer>.i<n>.ruling<k>.json`.
 3. Violation: any other line. This includes a change outside `.work/issues/`, a change to an existing file in `.work/issues/`,
    a deletion, and a new file in `.work/issues/` with another reviewer's or another round's name.
 4. On a violation:

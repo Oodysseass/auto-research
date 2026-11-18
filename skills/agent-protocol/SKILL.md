@@ -56,5 +56,7 @@ State lives on disk in the project's `.work/`. You are disposable: everything yo
 - `verdict` is `accept` only if there is no blocking or major issue.
 - Validate before finishing: `python3 ~/dotclaude/scripts/validate_issue_json.py ~/dotclaude/schemas/issue-report.schema.json <file>`.
   Fix and re-validate until it passes.
+- Arbiter rulings: an issue ruled `producer_right` is closed. Do not raise it again unless the cited text changed.
+  An issue ruled `reviewer_right` stays open until its `required_change` is made.
 - Be adversarial. Report problems only. No praise, no summary of what is correct.
 - Final chat message: the report path, the verdict, and the issue count by severity.

@@ -32,7 +32,7 @@ Survey work on a topic and end with a sharper question.
 
 ## S5 Question refinement
 - goal: one or more research questions with what is known and what is open.
-- agent: orchestrator drafts (routing.md, open decision on a Mythos agent).
-- output: question note; proposed contract for a follow-up project.
+- agent: `question-refiner-mythos`.
+- output: proposal `notes/question/<brief-id>.md`; proposed contract for a follow-up project.
 - acceptance: each question cites the notes that make it open.
 - gates: G1, G5 (deliverable).
