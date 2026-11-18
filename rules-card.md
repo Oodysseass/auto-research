@@ -14,3 +14,4 @@
 12. Do not change the model or an assumption silently. Every step uses listed assumptions (A-IDs) only.
 13. Commit messages follow the `commit-style` skill. Name what changed, never the agent, reviewer or tool. No trailers.
 14. Two repos: paper and code commit in the project repo, without workflow terms, only via `repos.py commit` (never `git add -A` or `git commit -a`); `.work/` commits in the `.work` repo. Never push `.work` or a `work/*` branch.
+15. Text for the human says what each thing is, in plain words: the section, the lemma or what it states, the assumption in words, what the brief says (quote it). Workflow IDs (C36, R13, A25, D1, RQ5, T7) and file:line pointers go only in a short `Refs:` at the end of the item.

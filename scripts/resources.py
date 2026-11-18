@@ -216,12 +216,12 @@ def do_raise(root, path, summary, affects, reason, scope_change, sow_version, re
     evidence = "; ".join([rel] + [f".work/{ID_FILES[i[0]]}#{i}" for i in ids])
     text = (f"# {cid}\n\n"
             f"- class: {'blocking' if blocking else 'checkpoint'}\n- status: open\n- event: {event}\n- header: New input\n"
-            f"- question: A new input file bears on the contract ({idl}): how should the project respond?\n"
+            f"- question: A new input file bears on the approved scope: how should the project respond?\n"
             f"- recommendation: {recommend}\n- reason: {clean(reason)}\n- depends: {idl}\n- evidence: {evidence}\n"
             f"- answer: none\n- answered: none\n\n"
             f"## Input\n\n{rel}: {clean(summary)}\n\n"
             "## Options\n\n"
-            f"- A | Update the contract | the contract is revised to take the new input into account; {idl} are revised and checked again\n"
+            "- A | Update the contract | the contract is revised to take the new input into account; the affected items are checked again\n"
             "- B | Ignore this file | the file stays recorded; the contract and the work continue as approved\n"
             "- C | Stop the project | the session ends and no further work runs until you restart it\n")
     d = Path(root) / ".work" / "decisions"

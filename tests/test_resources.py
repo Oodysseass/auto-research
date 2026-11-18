@@ -82,7 +82,7 @@ def test_new_file_that_changes_scope_raises_blocking_decision(proj):
     card = (proj / ".work" / "decisions" / f"{out['card']}.md").read_text()
     assert "- class: blocking" in card and "- status: open" in card
     assert "- depends: R1, N1, P1, C1" in card
-    assert "(R1, N1, P1, C1)" in card  # the question names the affected IDs
+    assert "R1" not in card.split("- depends:")[0]  # the question is plain; IDs stay in depends
     for label in ("Update the contract", "Ignore this file", "Stop the project"):
         assert label in card
     lint = subprocess.run([sys.executable, str(DEC), "--root", str(proj), "lint", out["card"]], capture_output=True, text=True)

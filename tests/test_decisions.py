@@ -281,14 +281,14 @@ def test_checkpoint_screen_and_digest(tmp_path, capsys):
     capsys.readouterr()
     run(root, "checkpoint")
     out = capsys.readouterr().out
-    assert "**D1**" in out and "taken: Extends chosen chain" in out and "C1, C2" in out
-    assert "route C2 to prover-mythos" in out and "extend budget of S7-lemma" in out
+    assert "Refs: D1" in out and "**D1**" not in out and "taken: Extends chosen chain" in out and "C1, C2" in out
+    assert "route C2 to prover-mythos" not in out and "extend budget of S7-lemma" not in out
     assert "old routing" not in out
     assert "S5-defs" not in out and "Usage" not in out
     run(root, "checkpoint", "--questions")
     q = json.loads(capsys.readouterr().out)
     assert len(q) == 1 and q[0]["options"][0]["label"] == "Accept all (Recommended)"
-    assert "D1 (" in q[0]["question"] and "Extends chosen chain" in q[0]["question"] and "above" not in q[0]["question"]
+    assert "Refs: D1" in q[0]["question"] and "Extends chosen chain" in q[0]["question"] and "above" not in q[0]["question"]
     run(root, "accept", "D1")
     run(root, "checkpoint", "--close")
     capsys.readouterr()
@@ -301,7 +301,7 @@ PACKET = """# Approval packet: S4
 
 ## What was produced
 
-The model, with assumptions A1 to A13.
+The model: thirteen assumptions on parties, timing, network and the adversary. Refs: A1 to A13
 
 ## What changed since the last approval
 
@@ -309,15 +309,15 @@ Everything: first approval.
 
 ## Review findings and resolution
 
-One major issue on the corrupted mining rule, settled provisionally by D1.
+One major issue on the corrupted mining rule, settled provisionally by your pending decision on what a corrupted success produces. Refs: D1
 
 ## What remains uncertain
 
-D1: corrupted successes extend the chosen chain (provisional).
+Corrupted successes are taken to extend the chosen chain, until you confirm it. Refs: D1
 
 ## What approval unlocks
 
-Stage S7: the lemma statements.
+The lemma statements. Refs: S7
 """
 
 
@@ -333,10 +333,28 @@ def test_packet_errors(tmp_path):
     root = project(tmp_path)
     run(root, "provisional", "D1")
     p = tmp_path / "S4.md"
-    p.write_text(PACKET.replace("D1", "the decision").replace("## What approval unlocks\n\nStage S7: the lemma statements.\n",
+    p.write_text(PACKET.replace("D1", "the decision").replace("## What approval unlocks\n\nThe lemma statements. Refs: S7\n",
                                                               "## What approval unlocks\n\n")
                  .replace("first approval.", "first approval. The stage used 300k tokens of its budget."))
     errs = check_packet.check(p, root)
     assert any("D1 is not named" in e for e in errs)
     assert any("empty" in e for e in errs)
     assert any("token" in e for e in errs) and any("budget" in e for e in errs)
+
+
+def test_ids_and_pointers_rejected_in_human_text(tmp_path):
+    root = project(tmp_path)
+    p = root / ".work/decisions/D1.md"
+    p.write_text(p.read_text().replace("- question: ", "- question: Given C3 and resources/BRIEF.md:48, ", 1))
+    errs = decisions.lint_card(decisions.load(root, "D1"))
+    assert any("'C3'" in e for e in errs) and any("BRIEF.md:48" in e for e in errs)
+    bad = tmp_path / "bad.md"
+    bad.write_text(PACKET.replace("Refs: D1\n", "per D1 and N5\n", 1))
+    assert any("'N5'" in e for e in check_packet.check(bad, root))
+
+
+def test_compress_puts_refs_last(tmp_path, capsys):
+    root = project(tmp_path)
+    run(root, "compress", "D1")
+    q = json.loads(capsys.readouterr().out)[0]
+    assert not q["question"].startswith("D1") and q["question"].endswith("(Refs: D1, A4)")

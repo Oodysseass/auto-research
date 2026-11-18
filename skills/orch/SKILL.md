@@ -36,6 +36,9 @@ Workflow files never enter the project repo: `.git/info/exclude` keeps out `.wor
 ## Asking the human
 
 Questions are about research content, scope and direction only. Every question has a class from the Class table of `approvals.md`.
+Every question, option, packet and report reads on its own in plain words (rules card 15): name the section, the lemma or
+what it states, the assumption in words, quote the brief. IDs go in the card's `depends` and `evidence` and in a trailing
+`Refs:`; `decisions.py lint` and `check_packet.py` reject bare IDs and file:line pointers.
 
 1. Write the card `.work/decisions/D<n>.md` from the template (`decisions.py next-id`): the question in one sentence, 2 to 4 options
    each with its consequence, the recommendation and its reason, `depends` (C-IDs and A-IDs), evidence pointers.
@@ -125,6 +128,10 @@ context; every turn re-reads the whole context, so cost per turn grows with it; 
    `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug>` and keep every artifact whose status is not `converged`.
 6. Pick the thread: `python3 ~/dotclaude/scripts/agenda.py next`. `none`: run `/handoff project-done`.
    Set `state.md` `- stage:` to `<T-ID> (<stage ID> <title>)`, or `<T-ID> (<title>)` for a thread without a stage.
+   - Its `next` starts with `decide first:`: write that question as a blocking card in plain words (options with
+     consequences, e.g. change the contract, do it within the contract, park the thread) and ask it before planning.
+     Apply the answer (contract change through a dated brief addendum and an approvals Log line; or a narrower goal;
+     or `agenda.py set T<n> status=parked` and pick the next thread), then clear `next`.
    - A thread with `stage: S<n>`: run that playbook stage as written (goal, agent, output, acceptance, gates), toward the
      thread's `goal` and `next` if they narrow it.
    - A thread without a stage (the human added it): plan briefs from its `goal`, `covers` and `next`, with gates chosen by the

@@ -48,12 +48,15 @@ Write `.work/packets/<stage>.md` with exactly these sections, in this order:
 - Changed: content changes since the last approval, by artifact. Not commits.
 - Findings: every blocking or major issue, one line each: what was wrong (quote a few words), how it was resolved
   (fixed, kept by an arbiter ruling, closed by an arbiter ruling, open). Minor issues: one line with their count.
-- Uncertain: every provisional decision (D-ID, the question, the option taken); every issue closed by an arbiter ruling rather than
-  by a fix (issue ID and one line of the ruling); every claim that is only `checked` or `provisional`, not `verified`; anything the
+- Uncertain: every provisional decision (the question and the option taken, in words); every issue closed by an arbiter ruling
+  rather than by a fix (what it was and one line of the ruling); every result that is only `checked` or `provisional`, not
+  `verified` (what it states or its name in the paper); anything the
   briefs' Result sections list as undone. `none` if empty.
 - Unlocks: the next stage and what it will produce, from the playbook and `state.md`.
 
-Plain language, research content only. Never write tokens, budgets, model names, tiers, effort, review round counts or file formats:
+Plain language, research content only. Say what each thing is: the section, the lemma or what it states, the assumption in
+words, what the brief says (quote it). Workflow IDs (claims, requirements, assumptions, decisions, issues, stages) and file:line
+pointers go only in a `Refs:` at the end of the line they belong to; the check rejects them anywhere else. Never write tokens, budgets, model names, tiers, effort, review round counts or file formats:
 the human never decides those. Name reviewers by what they check ("the proof check", "the counterexample search"), not by role name.
 Check: `python3 ~/dotclaude/scripts/check_packet.py .work/packets/<stage>.md`. Fix until it prints OK.
 

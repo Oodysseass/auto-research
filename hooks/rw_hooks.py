@@ -397,8 +397,9 @@ def prompt(inp, proj):
         else:
             save_prompt(inp)
             ctx += ("\nConversation: discuss with the project's context (`converse` skill). Change no paper, claim, "
-                    "contract, model or agenda file. If the human asks for committed work (write it up, prove it, "
-                    "restructure, add, drop or reorder agenda items) or accepts your offer, load the `request` skill and "
+                    "contract, model or agenda file. Agenda changes (add, drop, reorder, a new slate) are planning: follow "
+                    "~/dotclaude/skills/agenda/SKILL.md, no request. If the human asks for committed work (write it up, "
+                    "prove it, restructure a section) or accepts your offer, load the `request` skill and "
                     "record the commitment: `python3 ~/dotclaude/scripts/request.py record --session " +
                     request.session_key(inp.get("session_id")) + " --slug <slug> --title \"<title>\" --scope \"<the scope agreed in the discussion, one or two sentences>\"` "
                     "(it records the human's last prompt verbatim, with its attachments).\n")

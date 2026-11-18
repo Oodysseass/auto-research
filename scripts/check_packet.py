@@ -5,7 +5,8 @@ Usage: check_packet.py <packet.md> [--root R]
 
 Checks: the five sections, in order, each non-empty; every provisional decision card (status provisional in
 .work/decisions/) is named; no technical vocabulary (tokens, budgets, model tiers, effort, review round counts,
-file formats). Exit 0 if the packet passes, 1 otherwise.
+file formats); no workflow ID or file pointer outside a trailing `Refs:` part of a line (say what each thing is in
+plain words). Exit 0 if the packet passes, 1 otherwise.
 """
 import argparse
 import re
@@ -13,7 +14,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from rw_vocab import technical_terms  # noqa: E402
+from rw_vocab import technical_terms, workflow_refs  # noqa: E402
 import decisions  # noqa: E402
 
 SECTIONS = ["What was produced", "What changed since the last approval", "Review findings and resolution",
@@ -41,6 +42,9 @@ def check(path, root):
             errs.append(f"provisional decision {c['id']} is not named")
     for word, what in technical_terms(text):
         errs.append(f"technical term {word!r} ({what})")
+    body = re.sub(r"(?m)^#.*$", "", text)  # headings may carry the stage name
+    for word, what in workflow_refs(body):
+        errs.append(f"{what} {word!r} outside a `Refs:` line; say what it is in plain words")
     return errs
 
 

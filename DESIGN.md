@@ -22,6 +22,7 @@ The workflow makes Claude Code a research partner with a team of specialist agen
 7. **The human never opens files to operate the workflow.** Questions come as dialogs with decision cards; approvals come with packets. Reading full text of the model and main statements in chat at approval time is encouraged.
 8. **Discussion is free, commitment is checked.** Anything that changes the paper, the deliverable or a claim's strength goes through the gates.
 9. **Nothing of the workflow in shared history.** Workflow files never appear in a project's git history or in commit messages.
+10. **Plain words for the human.** IDs are bookkeeping for the files and the agents. Anything shown to the human says what each thing is (the section, the lemma or what it states, the assumption in words, what the brief says), with IDs only in a trailing `Refs:` so `/why` still works. Cards and packets are linted for it.
 
 ## 3. Modes of use
 
@@ -29,13 +30,13 @@ The workflow makes Claude Code a research partner with a team of specialist agen
 |---|---|---|
 | Conversation (default) | `claude` in a project | research discussion with project context (`converse` skill); quick probes allowed; capture at natural breaks |
 | Commitment | say "write it up", "prove it", "restructure", "drop X", "make Y first", accept the session's offer, or prefix `quick:` / `full:` | request flow (`request` skill): record with the agreed scope, assess impact, brief, agents, gates, packet |
-| Agenda | `/agenda`, or ask in conversation | show the threads in priority order; add, reorder, park, resume, drop. Scope changes need a blocking card |
+| Agenda | `/agenda`, or ask in conversation | planning only: show the threads in priority order; add, reorder, park, resume, drop, or replace the slate. Never starts work; never blocks on a contract question |
 | Autopilot | `rw` | works through the agenda: the first committed thread, one thread per session, re-reading the agenda each session; and deferred requests; restarts sessions itself; asks blocking decisions and checkpoints in session with a notification and continues; at the subscription limit waits for the reset and resumes; stops on project done, an error, a session that ends without a handoff, or a stage or session cap given at start |
 | Outside the harness | prefix `raw:` or a folder without `.work/` | plain Claude Code. In a `.work/` project, `raw:` skips the request flow only: the rules card, digest and Stop and PreCompact guards still apply |
 
 Prefixes `quick:` and `full:` override the default gate depth of a commitment.
 
-**Agenda.** `.work/threads.md` lists the project's threads of work in priority order, with status exploring, committed, parked, done or dropped. Intake seeds it from the playbook, one thread per stage; from then on the agenda, not the playbook, sets the order. `scripts/agenda.py` is its only writer and logs every change in `decisions.md`. A project from before the agenda gets one from `project_update.py` (seeded from its playbook and current stage) before `rw` works on it; an open request is finished first. Reordering, parking, resuming, adding inside scope, and dropping a thread no requirement or deliverable needs are logged; adding or dropping a requirement or deliverable is a scope change and asks a blocking card first.
+**Agenda.** `.work/threads.md` lists the project's threads of work in priority order, with status exploring, committed, parked, done or dropped. Intake seeds it from the playbook, one thread per stage; from then on the agenda, not the playbook, sets the order. `scripts/agenda.py` is its only writer and logs every change in `decisions.md`. A project from before the agenda gets one from `project_update.py` (seeded from its playbook and current stage) before `rw` works on it; an open request is finished first. Agenda changes are planning: they apply at once, are logged, record no request and start nothing. Approach, style or outline the human states with them goes verbatim into `BRIEF.md` as a dated addendum. A thread that would need a contract change gets a `decide first:` question, asked as a blocking card when the thread starts (or at once if the human wants); the contract changes only through that card.
 
 **Quick probes**: cheap checks during conversation (counterexample attempt, literature check, model-conformance check), one cheap dispatch each, output in `.work/issues/probes/` (not committed). Labeled "probe, unverified". They never change claim statuses and are kept only if captured.
 
@@ -106,9 +107,9 @@ Dispatched only by the orchestrator (main session). Shared rules in the `agent-p
 ## 7. Decisions and approvals
 
 - **Classes** (full table in `approvals.md`): blocking (asked now: contract and playbook approval, scope and contract changes, a request that changes a deliverable, a new SoW, main theorem statements, milestones and final deliverables, an unresolved deadlock on a main theorem, anything irreversible); checkpoint (recommendation taken provisionally, dependent claims marked `provisional`, confirmed in a batch; also stalled loops, round limits and other deadlocks); logged (routing, retries, budgets, minor fixes).
-- **Decision card**: one-sentence question; 2 to 4 options with consequences; recommendation and reason; dependent claim and assumption IDs; evidence pointers. Dialogs show a compressed card (question, options, the recommendation's reason) and must be self-contained (never "as shown above").
-- **Checkpoint**: one screen of pending provisional decisions, open questions and the decisions the system took alone (no token usage), with "accept all" or individual reversal; the first dialog names each decision and the option taken. Reversal re-queues dependent work.
-- **Approval packet** (summarizer): what was produced, what changed, review findings and resolutions, what is uncertain, what approval unlocks.
+- **Decision card**: one-sentence question; 2 to 4 options with consequences; recommendation and reason; dependent claim and assumption IDs; evidence pointers. Dialogs show a compressed card (question, options, the recommendation's reason, then `Refs:` with the card ID and its dependencies) and must be self-contained (never "as shown above") and in plain words: `decisions.py lint` rejects workflow IDs and file:line pointers in the question, reason and options.
+- **Checkpoint**: one screen of pending provisional decisions, open questions and the decisions the system took alone (no token usage, routing or budget entries), with "accept all" or individual reversal; the first dialog names each decision and the option taken. Reversal re-queues dependent work.
+- **Approval packet** (summarizer): what was produced, what changed, review findings and resolutions, what is uncertain, what approval unlocks. `check_packet.py` rejects workflow IDs outside `Refs:`.
 - **Budgets** are automatic per stage type and recalibrated from logged usage each time `rw` starts. Overrun: extend once by 50% if the last round found new issues, otherwise treat as stalled. Only the subscription limit reaches the human, as a notification.
 
 ## 8. Hooks
@@ -166,6 +167,8 @@ Decisions that changed the design, with reasons. Append new entries.
 10. Direct mode (every prompt a request) replaced by conversation first: research is mostly discussion; tasks emerge from it.
 11. Design overview wired into the tooling: `.claude/CLAUDE.md` loads this file for sessions in this repo, and the `workflow-guide` skill answers questions about the workflow from it in any project: intent must stay next to the code and be answerable without opening files.
 12. Conversation-first mode built, and an editable agenda (`threads.md`) replaces the fixed playbook stage order for `rw`: research intentions change during a project (new directions, reprioritised or dropped work), and the human must be able to reshape the plan in conversation without editing the contract.
+13. Plain words for the human, IDs only in `Refs:`: in the first live project, questions and reports were dense with claim, requirement, assumption and decision IDs and brief line pointers, and the human could not follow them.
+14. Agenda edits are planning, not requests: replacing the slate in the first live project was recorded as a request and blocked on a contract card before the plan changed; scope questions now wait for the thread that needs them.
 
 ## 13. Status
 

@@ -431,15 +431,13 @@ def do_raise(root, rid, affects, question, reason, scope, deliverable, recommend
     idl = ", ".join(ids)
     evidence = "; ".join([f"{BRIEF.as_posix()}#{rid}"] + [f".work/{resources.ID_FILES[i[0]]}#{i}" for i in ids])
     text = (f"# {cid}\n\n"
-            f"- class: blocking\n- status: open\n- event: {event}\n- header: Request {rid}\n"
+            f"- class: blocking\n- status: open\n- event: {event}\n- header: Scope change\n"
             f"- question: {resources.clean(question)}\n- recommendation: {recommend}\n- reason: {resources.clean(reason)}\n"
             f"- depends: {idl}\n- evidence: {evidence}\n- answer: none\n- answered: none\n\n"
             f"## Request\n\n{rid}: {get(root, rid).get('title')}\n\n## Options\n\n"
-            f"- A | Apply the request | the contract changes as the request asks; {idl} are revised and checked again\n"
+            "- A | Apply the request | the contract changes as the request asks; the affected requirements and checks are revised and checked again\n"
             "- B | Stay within the contract | the request is done only as far as the approved contract allows\n"
             "- C | Drop the request | nothing changes; the request is recorded as dropped\n")
-    if len(f"Request {rid}") > 12:
-        text = text.replace(f"- header: Request {rid}", f"- header: {rid}")
     d = Path(root) / ".work" / "decisions"
     d.mkdir(parents=True, exist_ok=True)
     p = d / f"{cid}.md"

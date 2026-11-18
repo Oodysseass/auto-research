@@ -1,7 +1,10 @@
-"""Technical vocabulary that must never reach the human in a question, decision card or approval packet. Stdlib only.
+"""Text that must never reach the human in a question, decision card or approval packet. Stdlib only.
 
 Questions to the human are about research content, scope and direction. Tokens, budgets, model tiers, effort levels,
-review round counts and file formats are decided by the system and logged.
+review round counts and file formats are decided by the system and logged (technical_terms).
+Workflow IDs (C36, R13, A25, D1, DL1, RQ5, T7, I2, S4, issue IDs) and file pointers (BRIEF.md:48, contract.md#N5) are
+bookkeeping: text for the human says what each thing is in plain words, and IDs go only in a trailing `Refs:` part of a
+line (workflow_refs).
 """
 import re
 
@@ -27,4 +30,18 @@ def technical_terms(text):
     for rx, what in _COMPILED:
         for m in rx.finditer(text or ""):
             out.append((m.group(0), what))
+    return out
+
+
+ID_RX = re.compile(r"\b(?:RQ\d+|DL\d+|[RNPACDTIS]\d+|G[0-5]/[a-z0-9-]+/\d+)\b")
+POINTER_RX = re.compile(r"[\w./-]+\.(?:md|tex|pdf|json|py|bib|txt)(?::\d+(?:-\d+)?|#[\w.-]+)")
+REFS_RX = re.compile(r"\(?\bRefs?:.*$", re.I | re.M)
+
+
+def workflow_refs(text):
+    """Return [(matched text, kind)] for every workflow ID or file pointer outside a trailing `Refs:` part of a line."""
+    body = REFS_RX.sub("", text or "")
+    out = [(m.group(0), "file pointer") for m in POINTER_RX.finditer(body)]
+    body = POINTER_RX.sub("", body)
+    out += [(m.group(0), "workflow ID") for m in ID_RX.finditer(body)]
     return out

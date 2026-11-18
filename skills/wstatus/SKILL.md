@@ -16,7 +16,7 @@ Read-only. Never edit or commit.
    (`legacy*.json`, issues without a `status` count as open), and the total `open issues:` line. For the per-artifact
    status of a non-converged slug, run `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug>`.
 3. Read the latest handoff named in its section only if the state section does not say what is next.
-4. Reply as one short block:
+4. Reply as one short block, in plain words (rules card 15: say what each item is; IDs only as a trailing `Refs:`):
    - stage: the current thread `<T-ID> (<stage> <name>)`, active brief, branch, last handoff
    - agenda: the open threads in order, one line each (position, T-ID, title, status, next); `rw` takes the first committed one
    - ideas: open questions first, then open ideas, one line each; pending captures, if any

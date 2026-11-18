@@ -26,7 +26,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from rw_vocab import technical_terms  # noqa: E402
+from rw_vocab import technical_terms, workflow_refs  # noqa: E402
 
 CLASSES = ("blocking", "checkpoint")
 STATUSES = ("open", "provisional", "accepted", "reversed")
@@ -127,6 +127,8 @@ def lint_card(card):
     for where, t in texts:
         for word, what in technical_terms(t):
             errs.append(f"{where}: technical term {word!r} ({what}); the system decides this, never the human")
+        for word, what in workflow_refs(t):
+            errs.append(f"{where}: {what} {word!r}; say what it is in plain words (IDs belong in `depends` and `evidence`)")
     return errs
 
 
@@ -140,7 +142,13 @@ def compress(card):
             out.append({"label": f"{o['label']} (Recommended)", "description": f"{o['consequence']} Why: {card['reason']}"})
         else:
             out.append({"label": o["label"], "description": o["consequence"]})
-    return {"question": f"{card['id']}: {card['question']}", "header": card["header"], "multiSelect": False, "options": out}
+    return {"question": f"{card['question']} ({refs(card)})", "header": card["header"], "multiSelect": False, "options": out}
+
+
+def refs(card, extra=()):
+    """The trailing `Refs:` part shown to the human: the card ID, then its dependencies."""
+    deps = [d.strip() for d in (card.get("depends") or "").split(",") if d.strip() and d.strip() != "none"]
+    return "Refs: " + ", ".join([card["id"], *deps, *extra])
 
 
 def option(card, key):
@@ -351,7 +359,8 @@ def do_reverse(root, cid, to):
 
 
 def digest(root):
-    """Logged decisions in decisions.md since the last checkpoint entry."""
+    """Logged decisions in decisions.md since the last checkpoint entry, for the human: routing, budget and other
+    system-only entries (a routing field, or a title with technical vocabulary) stay in the log and are not shown."""
     p = Path(root) / ".work" / "decisions.md"
     if not p.is_file():
         return []
@@ -369,6 +378,8 @@ def digest(root):
             continue
         if not cls and not re.search(r"^- routing:\s*(?!n/a)\S", e, re.M):
             continue
+        if re.search(r"^- routing:\s*(?!n/a)\S", e, re.M) or technical_terms(head):
+            continue
         out.append(head[3:].strip())
     return out
 
@@ -383,16 +394,16 @@ def checkpoint_screen(root):
     for c in prov:
         o = option(c, c["answer"])
         affected, _ = affected_claims(root, c)
-        out.append(f"- **{c['id']}** {c['question']}")
+        out.append(f"- **{c['question']}**")
         out.append(f"  - taken: {o['label']}. {o['consequence']}")
         out.append(f"  - why: {c['reason']}")
-        others = "; ".join(f"{x['key']} {x['label']}" for x in c["options"] if x["key"] != c["answer"])
+        others = "; ".join(x["label"] for x in c["options"] if x["key"] != c["answer"])
         out.append(f"  - alternatives: {others}")
-        out.append(f"  - provisional claims: {fmt_list(affected)}")
+        out.append(f"  - {refs(c)}" + (f"; provisional until decided: {fmt_list(affected)}" if affected else ""))
     if not prov:
         out.append("- none")
     out += ["", f"## Open questions ({len(opened)})", ""]
-    out += [f"- **{c['id']}** ({c['class']}) {c['question']}" for c in opened] or ["- none"]
+    out += [f"- {c['question']} ({c['class']}; {refs(c)})" for c in opened] or ["- none"]
     out += ["", "## Decided by the system since the last checkpoint", ""]
     out += [f"- {d}" for d in digest(root)] or ["- none"]
     return "\n".join(out) + "\n", prov
@@ -401,8 +412,9 @@ def checkpoint_screen(root):
 def checkpoint_questions(prov):
     if not prov:
         return []
-    taken = "; ".join(f"{c['id']} ({c['question'].rstrip('?')}): {option(c, c['answer'])['label']}" for c in prov)
-    return [{"question": f"Make these {len(prov)} provisional decisions final? {taken}.", "header": "Checkpoint",
+    taken = "; ".join(f"{c['question'].rstrip('?')}: {option(c, c['answer'])['label']}" for c in prov)
+    ids_ = ", ".join(c["id"] for c in prov)
+    return [{"question": f"Make these {len(prov)} provisional decisions final? {taken}. (Refs: {ids_})", "header": "Checkpoint",
              "multiSelect": False, "options": [
                  {"label": "Accept all (Recommended)", "description": "Every provisional decision becomes final. Work continues."},
                  {"label": "Review individually", "description": "One question per decision; any can be reversed."}]}]

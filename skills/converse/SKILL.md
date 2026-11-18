@@ -12,7 +12,8 @@ directions. Discussion is free; commitment is checked (DESIGN.md, principles 1 a
 
 - Read `.work/contract.md`, `model.md`, `glossary.md` and `claims.md` before the first substantive answer, and `threads.md`
   for the agenda. The prompt hook adds the agenda, open questions, ideas and dead ends, or the items related to the prompt.
-- Answer inside the project model. Name assumptions (A-IDs) and claims (C-IDs) when you use them. Say when something goes
+- Answer inside the project model. Say which assumption or result you use in words (what it states, its section or
+  lemma name), with IDs only in a short `Refs:` at the end (rules card 15). Say when something goes
   beyond the model or the contract scope. Never state a claim stronger than its status.
 - Check `deadends.md` before proposing an approach; say if one was tried.
 
@@ -28,7 +29,8 @@ Work is committed when the human asks for it ("write it up", "prove it", "restru
 liveness part", "make Y first") or accepts your offer. Offer at most once per topic, in one line, when the discussion has
 settled something worth doing: "Shall I commit this? It would <what changes, which files or agenda items>."
 On a commitment, load the `request` skill. Its step 1 records the human's prompt with the agreed scope (`--scope`).
-Agenda changes (add, reorder, park, drop threads) are commitments too: the request skill classifies them.
+Agenda changes (add, reorder, park, drop threads, a new slate) are planning: follow
+`~/dotclaude/skills/agenda/SKILL.md` (no request record, nothing starts, no contract question blocks the plan).
 Before a commitment that ends a long discussion, offer the capture dialog first (below), so ideas from it are not lost.
 
 ## Quick probes

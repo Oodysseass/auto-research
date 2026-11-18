@@ -9,7 +9,8 @@ Script: `C=~/dotclaude/scripts/capture.py`, agenda: `A=~/dotclaude/scripts/agend
 
 1. Source. This session's discussion since the last capture. For a pending stub from the session start, read the stub's
    transcript (the human's messages and your answers) instead, and pass the stub path to `summary --covers` in step 5.
-2. Candidates, each one line, self-contained (names the subject; never "the above"):
+2. Candidates, each one line, self-contained in plain words (names the subject; never "the above"; no bare IDs,
+   rules card 15):
    - idea or hypothesis; open question;
    - dead end (what was tried, why it failed);
    - decision the human took in discussion (a choice of direction, an interpretation of the model);

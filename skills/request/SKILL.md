@@ -14,6 +14,9 @@ Script: `R=~/dotclaude/scripts/request.py` (`python3 $R ...`, from the project r
 Never a step for the human: recording, saving attachments, the manifest, the registry, commits. Never ask about tokens,
 budgets, tiers, effort, rounds or file formats. A `raw:` prompt never reaches this skill.
 
+Every question and report to the human follows rules card 15: plain words first, IDs only in a trailing `Refs:`.
+Card questions and options are linted for it (`decisions.py lint`).
+
 ## 1. Record
 
 Before anything else, run the record command the prompt hook gave you:
@@ -41,10 +44,9 @@ Workspace files the prompt names inside the project are references, not attachme
    `state.md` "Next actions" (`RQ<n> deferred until <stage> is done`), commit, and stop (step 5). The next `/orch`
    session runs deferred requests at its stage end. No conflict: say nothing about it.
 3. Impact. Name every R-, N-, P-, A- and C-ID the request touches, the deliverables (DL-IDs) and the threads (T-IDs).
-   - An agenda change (add, reorder, park, resume or drop a thread): apply it with `~/dotclaude/scripts/agenda.py`
-     (`--by human --reason "<the human's words>"`) after the checks below; it needs no gates. Reorder, park, resume, a new
-     thread inside the scope, or dropping a thread no R- or DL-ID needs: logged. Anything that adds or drops a requirement or
-     deliverable is a scope change (next item) first. A new thread that is work to do now is also executed (step 3).
+   - An agenda change (add, reorder, park, resume, drop, or a new slate) is planning, not a request: follow
+     `~/dotclaude/skills/agenda/SKILL.md` steps 3 to 6 instead of this skill, and record no request. It never blocks on a
+     contract question: a thread that would need a contract change gets a `decide first:` question, asked when it starts.
    - Changes the scope or a deliverable (adds, drops or reshapes a requirement or deliverable, its format or due date,
      or crosses an N-row): blocking card. `python3 $R raise RQ<n> --affects <IDs> --question "<one sentence?>" --reason
      "<line>" --scope-change | --deliverable-change`, commit, ask it now (`decisions.py compress D<n>`), record the
@@ -88,9 +90,10 @@ Workspace files the prompt names inside the project are references, not attachme
 2. `python3 $R close RQ<n> --status <done | answered | dropped> --summary "<one line>"`. It records the commits and
    changed files of both repos since `rev before`. Commit the `.work` repo: `update project state after <topic>`.
    The project repo is committed already (step 3.3); never commit workflow files there.
-3. Packet in chat, at most 12 lines, plain language:
-   - **Changed**: files and what changed in each; claims and their status now.
-   - **Review**: gates run; issues found and how each was resolved; anything provisional (card IDs).
+3. Packet in chat, at most 12 lines, plain language: every item says what it is (section, lemma or its statement,
+   assumption in words, what the brief says); IDs only in a `Refs:` at the end of the item (rules card 15).
+   - **Changed**: files and what changed in each; results and their status now.
+   - **Review**: checks run; issues found and how each was resolved; anything provisional (what is pending, in words).
    - **Uncertain**: what is not proven, not checked (quick mode), or rests on a provisional decision. "None" if none.
    - **Commits**: both repos, short hashes.
 
