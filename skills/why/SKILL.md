@@ -1,14 +1,14 @@
 ---
 name: why
 description: Explain any claim (C3), assumption (A2), decision (D4), review issue (G2/proof-checker/1) or request (RQ2), or trace a file or commit back to its request, of a research workflow project (.work/) in depth, from the files only. Read-only. Usage /why <ID>.
-argument-hint: "<C-ID | A-ID | D-ID | RQ-ID | issue ID | file path | commit, e.g. C3, D2, RQ4, G2/proof-checker/1>"
+argument-hint: "<C-ID | A-ID | D-ID | RQ-ID | T-ID | I-ID | DL-ID | issue ID | file path | commit, e.g. C3, D2, RQ4, T5, G2/proof-checker/1>"
 ---
 
 # Why
 
 Target: `$ARGUMENTS`. Read-only: never edit, commit or dispatch. Answer from files only; if a file does not say, say "not recorded".
 
-1. Identify the kind: `C<n>` claim, `A<n>` assumption, `D<n>` decision, `<gate>/<reviewer>/<n>` issue, `OP<n>` open point in `model.md`, `RQ<n>` request, a file path, a commit hash.
+1. Identify the kind: `C<n>` claim, `A<n>` assumption, `D<n>` decision, `<gate>/<reviewer>/<n>` issue, `OP<n>` open point in `model.md`, `RQ<n>` request, `T<n>` thread, `I<n>` idea or question, `DL<n>` deliverable, a file path, a commit hash.
 2. Gather:
    - Claim: its `claims.md` entry; the statement in the paper at its label; its proof if any; `depends_on` (both directions:
      what it uses, and every claim that uses it); its assumptions with their `model.md` rows; every issue whose `claim` is it
@@ -21,6 +21,10 @@ Target: `$ARGUMENTS`. Read-only: never edit, commit or dispatch. Answer from fil
      `resources/`; its briefs, cards, claims, gates, review reports, commits and changed files; its `decisions.md` entry.
    - File path or commit: `python3 ~/dotclaude/scripts/request.py trace <path | hash>` names the requests that changed it;
      then explain each as a request. If none: `repos.py log`, the briefs that name the file, "not from a request".
+   - Thread: its block in `.work/threads.md` (position, status, goal, stage, covers, next, note), the `decisions.md` entries
+     `agenda: ... T<n> ...` (who added, moved, parked or dropped it, and why), its briefs and handoffs, the ideas that became it.
+   - Idea or question: its block in `.work/ideas.md`, the session summary in `.work/sessions/` it came from, the thread it became.
+   - Deliverable: its row in `contract.md`, the R-IDs it covers, the threads that cover it, approvals of it.
    - Issue: every round of the report that has it, the producer responses, the rulings, the brief, the cited text in the artifact now.
    For every claim, decision and brief, also run `request.py trace <ID>`: if a request caused it, say which (RQ-ID, date, title).
 3. Reply in this order: what it is (one or two sentences); why it stands as it does (the chain of evidence, with file:line or

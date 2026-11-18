@@ -1,13 +1,15 @@
 ---
 name: orch
-description: Run one orchestrator session of a research workflow project (.work/): one playbook stage, or the rest of it. Reads state, writes briefs, dispatches agents, runs gates, asks the human inside the session with decision cards, ends with /handoff. Started by bin/rw, which loops sessions.
+description: Run one orchestrator session of a research workflow project (.work/) - the first committed thread of the agenda (.work/threads.md), or the rest of it. Reads state, writes briefs, dispatches agents, runs gates, asks the human inside the session with decision cards, ends with /handoff. Started by bin/rw, which loops sessions.
 disable-model-invocation: true
 ---
 
 # Orchestrator
 
 `rw` starts this session, and the next one when this one ends. You are disposable. Everything you know comes from `.work/`,
-and everything you decide goes back to it. **One playbook stage per session.**
+and everything you decide goes back to it. **One agenda thread per session**: the first `committed` thread of
+`.work/threads.md` (`python3 ~/dotclaude/scripts/agenda.py next`). The human reorders, adds, parks and drops threads between
+sessions; read the agenda fresh every time and never reorder it yourself.
 
 ## You never
 
@@ -95,9 +97,10 @@ you commit that producer's output, so it is never reported as new.
 ## Session end
 
 End the session only through `/handoff`, with one outcome:
-- `stage-done`: the stage is done (every brief `done`, approvals given). `rw` starts the next stage in a fresh session.
+- `stage-done`: the thread's work for this session is done (its briefs `done`, approvals given). `rw` starts the next session,
+  which takes the next committed thread.
 - `context`: the context threshold hook fired. Finish the current round's bookkeeping first. `rw` resumes in a fresh session.
-- `project-done`: the last stage is done.
+- `project-done`: no thread is `committed` any more (`agenda.py next` prints `none`).
 - `error`: something only a human can fix outside the workflow (a missing tool, a broken repo). Put it in a blocking card first if you can.
 
 Context threshold: min(300k tokens, 60% of the window). Reasons: binding files read at session start lose weight in a long
@@ -110,15 +113,22 @@ context; every turn re-reads the whole context, so cost per turn grows with it; 
    Then `python3 ~/dotclaude/scripts/repos.py check`. On exit 1 (`.work/` not a repo, a missing exclude line, or a workflow file
    tracked by the project repo): `repos.py init` fixes the first two. A tracked workflow file is a blocking card (untrack it with
    `git rm --cached`, message shown first, or stop); never untrack anything without the answer.
-2. Read, in order: `.work/state.md`; the latest file in `.work/handoffs/` (not `_template.md`; fold in any `*-auto-*.md` snapshot);
-   `.work/contract.md`; `.work/approvals.md`; `resources/BRIEF.md`; the playbook file `~/dotclaude/skills/intake/playbooks/<playbook>.md`.
+2. Read, in order: `.work/state.md`; `.work/threads.md`; the latest file in `.work/handoffs/` (not `_template.md`; fold in any
+   `*-auto-*.md` snapshot); `.work/contract.md`; `.work/approvals.md`; `resources/BRIEF.md`; the playbook file
+   `~/dotclaude/skills/intake/playbooks/<playbook>.md`; open ideas and questions in `.work/ideas.md` that the thread names.
 3. Load the `model-routing`, `review-gates` and `commit-style` skills. Check `resources/` against the manifest (above).
 4. Pending decisions: `decisions.py list`. Ask every `open` card now (blocking first). Requeued briefs in `state.md` run first.
 5. Open issues: for each artifact with reports in `.work/issues/`, run
    `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug>` and keep every artifact whose status is not `converged`.
-6. Plan the stage named in `state.md`. If every brief of that stage is `done`, advance `state.md` to the next stage and run that one.
+6. Pick the thread: `python3 ~/dotclaude/scripts/agenda.py next`. `none`: run `/handoff project-done`.
+   Set `state.md` `- stage:` to `<T-ID> (<stage ID> <title>)`, or `<T-ID> (<title>)` for a thread without a stage.
+   - A thread with `stage: S<n>`: run that playbook stage as written (goal, agent, output, acceptance, gates), toward the
+     thread's `goal` and `next` if they narrow it.
+   - A thread without a stage (the human added it): plan briefs from its `goal`, `covers` and `next`, with gates chosen by the
+     request skill's rules (`request.py gates`). A goal that would change scope is a blocking card first.
+   - A thread whose work turns out to need a decision of direction (not a technical one): blocking card, as usual.
    Work on the project repo's current branch; record it in `state.md`. Create a branch only when the work must stay apart from
-   it, named `work/<stage-id>-<slug>`, local only.
+   it, named `work/<thread-id>-<slug>`, local only.
 7. Work loop, for each brief of the stage:
    1. Write the brief from `.work/briefs/_template.md`, every field filled (artifact slug, stage type, critical, main theorem, gates
       from the playbook). Trace each acceptance criterion to R-IDs or C-IDs. Tier per routing.md. Budget: `budgets.py get <stage type>`.
@@ -140,9 +150,10 @@ context; every turn re-reads the whole context, so cost per turn grows with it; 
       set `base_status` to what the gates earned), set the brief to `done`. Commit.
 8. Deferred requests (`python3 ~/dotclaude/scripts/request.py list --status deferred`): run each through the request skill,
    steps 2 to 4 (no record, no wait), before the stage-end steps below. Briefs written for a request carry `- request: RQ<n>`.
-9. Stage end, in this order: if the stage has an approval (G5), the summarizer packet, shown in chat; then the checkpoint (above),
-   which includes a checkpoint-class approval card; then a blocking approval card, if any. Then `/handoff stage-done`.
-   Before any handoff, update `state.md`.
+9. Thread end, in this order: if the stage has an approval (G5), the summarizer packet, shown in chat; then the checkpoint
+   (above), which includes a checkpoint-class approval card; then a blocking approval card, if any. Then update the agenda:
+   `agenda.py --by orchestrator set T<n> status=done` when its goal is met, or `next="<what remains>"` when more sessions are
+   needed (it stays first). Commit. Then `/handoff stage-done`. Before any handoff, update `state.md`.
 
 Commits: follow the `commit-style` skill, in the repo that holds the change (Two repos, above). Messages say what changed
 ("add proof of lemma 2" in the project repo, "review model, round 2" in the `.work` repo), never which agent, reviewer, model

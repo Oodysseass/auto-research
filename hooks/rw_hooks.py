@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Hooks for the research workflow. Usage: rw_hooks.py <event>, hook input JSON on stdin.
 
-Events: session-start, prompt, pre-compact, stop, pre-tool-use, ask, post-agent, stop-failure, statusline.
+Events: session-start, prompt, pre-compact, stop, pre-tool-use, ask, post-agent, stop-failure, session-end, statusline.
 Every hook does nothing unless $CLAUDE_PROJECT_DIR/.work/ exists (fallback: the input's cwd), except statusline,
 which prints a status line in every project and caches context and usage-limit data for the other hooks.
 Two repos per project (scripts/repos.py): the project repo, and .work/ as its own repo. Hooks track both.
 The project may live in a subdirectory of the project repo; then hooks see only that subdirectory of it (repos.py).
 Notifications: $RW_NOTIFY_CMD <title> <message> if set, else osascript on macOS.
 bin/rw sets RW_LOOP=1 and RW_RUN=<id>; the Stop hook uses them to end a session after /handoff.
-Direct mode (no RW_LOOP): session-start reminds the session that typed prompts are requests (request skill); prompt saves
-each typed prompt for scripts/request.py and points to the skill, except `raw:` prompts (bypass) and `/` commands.
+Conversation mode (no RW_LOOP, the default): a typed prompt is discussion. prompt saves it (so a later commitment can record
+it), adds the conversation note, and a digest of the agenda, ideas and dead ends on the first prompt, after compaction and
+when those files changed; otherwise the ideas and dead ends that share words with the prompt. A `quick:` or `full:` prefix
+is a commitment at once (request skill). `raw:` bypasses the harness; `/` commands pass through.
+session-end writes a capture stub (scripts/capture.py) when a conversation session ended without a capture.
 Stop and PreCompact block only for unrecorded work: commits to the project, uncommitted project edits made by this session's
 file tools, and changes to .work/claims.md, each newer than the last change of .work/state.md. Workflow bookkeeping elsewhere
 in .work/ never counts.
@@ -33,10 +36,12 @@ try:
     import repos  # noqa: E402
     import request  # noqa: E402
     import resources  # noqa: E402
+    import agenda  # noqa: E402
+    import capture  # noqa: E402
     repos.TIMEOUT = 5
     IMPORT_ERROR = None
 except Exception as _e:  # fail open: reported and ignored in main()
-    repos = request = resources = None
+    repos = request = resources = agenda = capture = None
     IMPORT_ERROR = _e
 RULES_CARD = DOTCLAUDE / "rules-card.md"
 STATE_DIR = Path(os.environ.get("RW_HOOKS_STATE_DIR", Path(tempfile.gettempdir()) / "rw-hooks"))
@@ -229,21 +234,94 @@ def emit(obj):
 
 # Events
 
-def direct_mode_notes(proj):
-    """Session-start lines for direct mode (a plain `claude` session, not under rw)."""
-    out = ["Direct mode: every prompt the human types is a request. Handle it with the `request` skill: record, assess, "
-           "execute with proportional gates, report, then wait. Exceptions: a prompt that starts with `raw:` (answer it "
-           "directly, outside the harness) or `/` (a command). Never continue into playbook stages unless asked; `rw` "
-           "is the autopilot."]
+MEMORY_FILES = ("threads.md", "ideas.md", "deadends.md", "state.md")
+STOPWORDS = set("""this that with from have what which when where would could should there their about into than then they them
+these those been being does doing also only just like more most some such very will your yours mine ours here were make made
+need needs used using want wants think know whether because before after while each every other same into onto over under""".split())
+
+
+def agenda_lines(proj, limit=8):
+    try:
+        _, threads = agenda.load(proj)
+    except Exception:
+        return []
+    open_ = [t for t in threads if t["status"] in ("committed", "exploring", "parked")]
+    return [f"{n}. {t['id']} {t['title']} ({t['status']})" + (f": next {t['next']}" if t.get("next") not in (None, "none") else "")
+            for n, t in enumerate(open_[:limit], 1)] + ([f"... {len(open_) - limit} more"] if len(open_) > limit else [])
+
+
+def idea_entries(proj):
+    """[(label, text)] for open ideas and questions, then dead ends."""
+    out = []
+    try:
+        for m in re.finditer(r"(?ms)^## (I\d+) \| (\S+) \| open\s*\n- text: (.*?)$", (proj / ".work" / "ideas.md").read_text()):
+            out.append((f"{m.group(1)} ({m.group(2)})", m.group(3)))
+    except OSError:
+        pass
+    try:
+        for line in (proj / ".work" / "deadends.md").read_text().splitlines():
+            if line.startswith("- ") and "<" not in line and line.count("|") >= 2:
+                out.append(("dead end", line[2:]))
+    except OSError:
+        pass
+    return out
+
+
+def words(text):
+    return {w for w in re.findall(r"[a-z][a-z0-9-]{3,}", text.lower()) if w not in STOPWORDS}
+
+
+def digest(proj):
+    parts = []
+    ag = agenda_lines(proj)
+    if ag:
+        parts.append("## Agenda (.work/threads.md, in priority order)\n" + "\n".join(ag))
+    ent = idea_entries(proj)
+    qs = [f"- {l}: {t}" for l, t in ent if "question" in l]
+    ideas = [f"- {l}: {t}" for l, t in ent if l.startswith("I") and "question" not in l]
+    dead = [f"- {t}" for l, t in ent if l == "dead end"]
+    if qs:
+        parts.append("## Open questions\n" + "\n".join(qs[-6:]))
+    if ideas:
+        parts.append("## Open ideas (latest)\n" + "\n".join(ideas[-6:]))
+    if dead:
+        parts.append("## Dead ends (latest)\n" + "\n".join(dead[-6:]))
+    return "\n\n".join(parts)
+
+
+def relevant(proj, text, n=3):
+    q = words(text)
+    scored = sorted(((len(q & words(t)), l, t) for l, t in idea_entries(proj)), key=lambda x: -x[0])
+    return [f"- {l}: {t}" for k, l, t in scored[:n] if k >= 2]
+
+
+def memory_hash(proj):
+    return hashlib.sha1("".join(file_hash(proj / ".work" / f) or "-" for f in MEMORY_FILES).encode()).hexdigest()
+
+
+def digest_cache(inp):
+    sid = "".join(c for c in str(inp.get("session_id", "nosession")) if c.isalnum() or c in "-_")
+    return STATE_DIR / f"{sid}.digest"
+
+
+def conversation_notes(proj):
+    """Session-start lines for conversation mode (a plain `claude` session, not under rw)."""
+    out = ["Conversation mode: this session is a research discussion with the project's context. Load the `converse` "
+           "skill now and follow it. Change no paper, claim, contract, model or agenda file during discussion. Work is "
+           "committed only when the human asks for it or accepts your offer; then the `request` skill runs it. "
+           "`raw:` prompts bypass the harness; `quick:` and `full:` prompts are commitments at once."]
     claude_md = next((p for p in (proj / "CLAUDE.md", proj / ".claude" / "CLAUDE.md") if p.is_file()), None)
-    if claude_md is None or "## Direct mode" not in claude_md.read_text():
-        out.append("This project predates direct mode. Before the first request, run "
+    if (claude_md is None or "## Working mode" not in claude_md.read_text()
+            or not (proj / ".work" / "threads.md").is_file()):
+        out.append("This project predates conversation mode. Before anything else, run "
                    "`python3 ~/dotclaude/scripts/project_update.py` (one-time, idempotent) and commit its .work changes.")
     try:
-        reqs = re.findall(r"^## (RQ\d+)\s*\n(?:- .*\n)*?- status: (open|deferred)\s*$",
-                          (proj / ".work" / "requests.md").read_text(), re.M)
-    except OSError:
-        reqs = []
+        stubs = capture.pending(proj)
+    except Exception:
+        stubs = []
+    for st in stubs[:3]:
+        out.append(f"Capture pending from an earlier session ({st['stub']}, transcript {st['transcript']}). Offer its "
+                   "capture dialog first, with the `capture` skill.")
     try:
         r = resources.scan(proj) if (proj / resources.MANIFEST).is_file() else None
     except Exception:
@@ -253,8 +331,13 @@ def direct_mode_notes(proj):
                  [f"deleted {x['path']}" for x in r["deleted"]]
         out.append("Unprocessed inputs in resources/: " + ", ".join(listed[:10]) +
                    (f" and {len(listed) - 10} more" if len(listed) > 10 else "") +
-                   ". Process them before the next request, as in the orch skill \"New inputs in resources/\" "
+                   ". Tell the human, then process them as in the orch skill \"New inputs in resources/\" "
                    "(scan --warn, then record or raise each new file).")
+    try:
+        reqs = re.findall(r"^## (RQ\d+)\s*\n(?:- .*\n)*?- status: (open|deferred)\s*$",
+                          (proj / ".work" / "requests.md").read_text(), re.M)
+    except OSError:
+        reqs = []
     if reqs:
         out.append("Requests not finished: " + ", ".join(f"{r} ({s})" for r, s in reqs) +
                    " (`python3 ~/dotclaude/scripts/request.py list`).")
@@ -267,7 +350,11 @@ def session_start(inp, proj):
     parts = ["Research workflow project (.work/ present). Binding: .work/contract.md, model.md, glossary.md, claims.md, "
              "resources/BRIEF.md. Follow ~/.claude/rules-card.md."]
     if not os.environ.get("RW_LOOP"):
-        parts += direct_mode_notes(proj)
+        parts += conversation_notes(proj)
+        try:
+            digest_cache(inp).unlink()  # the first prompt (or the first after compaction) gets the full digest
+        except OSError:
+            pass
     if inp.get("source") == "compact":
         parts.append("Context was just compacted. Before any other work: if this session changed .work/ or committed, "
                      "run /handoff now. Then re-read .work/contract.md, model.md and glossary.md before producing anything.")
@@ -280,6 +367,22 @@ def session_start(inp, proj):
     emit({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "\n\n".join(parts)}})
 
 
+def save_prompt(inp):
+    sid = request.session_key(inp.get("session_id"))
+    p = request.saved_prompt_path(sid)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"prompt": inp.get("prompt"), "transcript": inp.get("transcript_path"),
+                             "time": datetime.now().isoformat(timespec="seconds")}))
+    return sid
+
+
+def record_note(sid, why):
+    return (f"\n{why} Load the `request` skill now and follow it. Step 1, before anything else: "
+            "`python3 ~/dotclaude/scripts/request.py record --session " + sid +
+            " --slug <slug> --title \"<title>\"` (add `--follow-up RQ<n>` if it only continues the request in "
+            "progress).\n")
+
+
 def prompt(inp, proj):
     ctx = RULES_CARD.read_text()
     text = str(inp.get("prompt") or "").lstrip()
@@ -287,16 +390,36 @@ def prompt(inp, proj):
         if text.lower().startswith("raw:"):
             ctx += ("\nraw: prompt. Answer it directly, outside the harness: do not load the request skill, record "
                     "nothing in resources/ or .work/, dispatch no agents, run no gates, commit nothing unless asked.\n")
-        elif not text.startswith("/"):
-            sid = request.session_key(inp.get("session_id"))
-            p = request.saved_prompt_path(sid)
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(json.dumps({"prompt": inp.get("prompt"), "transcript": inp.get("transcript_path"),
-                                     "time": datetime.now().isoformat(timespec="seconds")}))
-            ctx += ("\nDirect mode: this prompt is a request. Load the `request` skill now and follow it. Step 1, before "
-                    "anything else: `python3 ~/dotclaude/scripts/request.py record --session " + sid +
-                    " --slug <slug> --title \"<title>\"` (add `--follow-up RQ<n>` if it only continues the request in "
-                    "progress).\n")
+        elif text.startswith("/"):
+            pass
+        elif re.match(r"(?i)(quick|full)\s*:", text):
+            ctx += record_note(save_prompt(inp), "Commitment (`quick:` or `full:` prefix): this prompt is a request.")
+        else:
+            save_prompt(inp)
+            ctx += ("\nConversation: discuss with the project's context (`converse` skill). Change no paper, claim, "
+                    "contract, model or agenda file. If the human asks for committed work (write it up, prove it, "
+                    "restructure, add, drop or reorder agenda items) or accepts your offer, load the `request` skill and "
+                    "record the commitment: `python3 ~/dotclaude/scripts/request.py record --session " +
+                    request.session_key(inp.get("session_id")) + " --slug <slug> --title \"<title>\" --scope \"<the scope agreed in the discussion, one or two sentences>\"` "
+                    "(it records the human's last prompt verbatim, with its attachments).\n")
+            cache, h = digest_cache(inp), memory_hash(proj)
+            try:
+                old = cache.read_text().strip()
+            except OSError:
+                old = None
+            if old != h:
+                d = digest(proj)
+                if d:
+                    ctx += "\n# Project memory\n\n" + d + "\n"
+                try:
+                    STATE_DIR.mkdir(parents=True, exist_ok=True)
+                    cache.write_text(h)
+                except OSError:
+                    pass
+            else:
+                rel = relevant(proj, text)
+                if rel:
+                    ctx += "\nRelated in project memory:\n" + "\n".join(rel) + "\n"
     emit({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": ctx}})
 
 
@@ -396,7 +519,8 @@ def stop(inp, proj):
     if pending:
         emit({"decision": "block", "reason":
               f"Research workflow: this session made {describe(*pending)} that .work/state.md does not record yet. "
-              "Run /handoff before stopping (in direct mode: finish the request's report step, which updates state.md)."})
+              "Run /handoff before stopping (for a commitment in a plain session: finish the request's report step, which "
+              "updates state.md)."})
         return
     end = end_marker(proj)
     if this_run(end):
@@ -600,9 +724,18 @@ def statusline(inp):
     print(" | ".join(parts))
 
 
+def session_end(inp, proj):
+    """Conversation sessions that ended without a capture leave a stub; the next session offers the capture dialog."""
+    if os.environ.get("RW_LOOP"):
+        return
+    if not request.saved_prompt_path(request.session_key(inp.get("session_id"))).is_file():
+        return  # no conversation prompt in this session
+    capture.do_stub(proj, inp.get("session_id"), inp.get("transcript_path") or "unknown")
+
+
 EVENTS = {"session-start": session_start, "prompt": prompt, "pre-compact": pre_compact,
           "stop": stop, "pre-tool-use": pre_tool_use, "ask": ask, "post-agent": post_agent,
-          "stop-failure": stop_failure, "statusline": statusline}
+          "stop-failure": stop_failure, "session-end": session_end, "statusline": statusline}
 
 
 def main():

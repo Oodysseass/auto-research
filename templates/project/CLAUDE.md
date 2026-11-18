@@ -15,22 +15,27 @@ All state lives in `.work/`, its own local git repo. The project repo never trac
 - `.work/model.md`: model and assumptions (A-IDs). Binding.
 - `.work/glossary.md`: terms, macros, notation. Wins over global glossaries.
 - `.work/claims.md`: claim registry. Never state a claim stronger than its status.
-- `.work/state.md`: current stage, next actions, pending decisions, requeued briefs.
+- `.work/threads.md`: the agenda, in priority order. `rw` works on the first `committed` thread.
+- `.work/state.md`: current thread, next actions, pending decisions, requeued briefs.
+- `.work/ideas.md`, `.work/sessions/`: ideas, open questions and session summaries kept from discussions.
 - `.work/approvals.md`: the class of every question to me (blocking, checkpoint, logged).
 - `.work/decisions/`: one card per question to me. `.work/packets/`: approval packets.
 - `.work/briefs/`, `.work/issues/`, `.work/handoffs/`, `.work/decisions.md`, `.work/deadends.md`.
 - `.work/resources.manifest`: every file seen in `resources/`, which is append-only. New files are processed at session start.
 
-Run `rw` from the project root (the directory that contains `.work/`). It loops: one orchestrator session per stage, each with fresh context, asking me inside the
-session and notifying me when my input is needed. `/why <ID>` explains any claim, assumption, decision, issue or request.
+Run `rw` from the project root (the directory that contains `.work/`). It loops: one orchestrator session per agenda thread, each with
+fresh context, asking me inside the session and notifying me when my input is needed. `/why <ID>` explains any claim,
+assumption, decision, issue, request, thread or idea. `/agenda` shows the agenda and changes it.
 
-## Direct mode
+## Working mode
 
-In a plain `claude` session here, every prompt I type is a request, handled by the `request` skill, unless it starts with
-`raw:` (answered directly, outside the harness) or `/` (a command). The skill records the request in `resources/BRIEF.md`
-(attachments in `resources/<date>-<slug>/`, listed in the manifest), checks it against the contract, model and claims,
-does it with gates proportional to what it touches (a `quick:` or `full:` prefix overrides), reports a short
-packet, commits in both repos and waits. It never continues into playbook stages unless I ask. Registry: `.work/requests.md`.
+A plain `claude` session here is a research conversation with the project's context (`converse` skill). Discussion changes
+no paper, claim, contract, model or agenda file. Work is committed when I ask for it ("write it up", "prove it",
+"restructure", "drop X", "make Y first") or accept the session's offer; then the `request` skill records it in
+`resources/BRIEF.md`, checks it against the contract, model and claims, does it with proportional gates, reports a short
+packet, commits in both repos and waits. A `quick:` or `full:` prefix commits a prompt at once and sets the gate depth.
+`raw:` answers outside the harness; `/` is a command. At natural breaks the session offers a capture dialog: only what I
+tick is kept (`capture` skill). Registry: `.work/requests.md`.
 
 ## Build
 

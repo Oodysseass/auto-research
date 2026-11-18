@@ -54,7 +54,7 @@ EXCLUDES = ["/.work/", "/CLAUDE.md", "/.claude/", "/resources/", "output/"]
 EXCLUDE_HEADER = "# research workflow (local only)"
 # Paths that are workflow files: the project repo must never track them.
 WORKFLOW_PATHS = (".work/", "CLAUDE.md", ".claude/", "resources/BRIEF.md")
-WORK_GITIGNORE = ".rw/\n.DS_Store\n"
+WORK_GITIGNORE = ".rw/\n.DS_Store\nissues/probes/\n"
 # Seconds before a git call is abandoned. None: no limit. The hooks set it.
 TIMEOUT = None
 

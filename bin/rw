@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 """rw: run orchestrator sessions in a loop in the current project, each with fresh context.
 
-Usage: rw [--stop-before <stage>] [extra claude arguments, e.g. --permission-mode plan]
-  --stop-before S8   stop the loop instead of starting a session whose stage (state.md `- stage:`) names S8.
+Each session works on the first `committed` thread of the agenda (.work/threads.md, scripts/agenda.py), read fresh every
+session, so agenda changes made in a plain session (/agenda) apply at the next session.
+Usage: rw [--stop-before <thread or stage>] [extra claude arguments, e.g. --permission-mode plan]
+  --stop-before T6   stop the loop instead of starting a session whose state.md `- stage:` line names T6 (or S8).
 
 Each session runs `claude --model RW_MODEL --effort RW_EFFORT ... /orch`. The orchestrator asks the human inside the
 session (AskUserQuestion; a hook sends a notification). The session ends only through /handoff, which writes

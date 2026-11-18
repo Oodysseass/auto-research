@@ -100,14 +100,31 @@ def manifest(proj):
     return {r[0]: r for r in rows}
 
 
-# ---------- hook: direct mode, raw:, commands, rw ----------
+# ---------- hook: conversation, commitments, raw:, commands, rw ----------
 
-def test_plain_prompt_is_a_request(env, tmp_path, proj):
+def test_plain_prompt_is_conversation(env, tmp_path, proj):
     out = submit(env, tmp_path, "tighten the intro of section 2")
-    assert "request` skill" in ctx(out) and "request.py record --session s1" in ctx(out)
-    assert "Rules card" in ctx(out)
+    assert "Conversation:" in ctx(out) and "converse" in ctx(out) and "Rules card" in ctx(out)
+    assert "--scope" in ctx(out) and "Step 1, before anything else" not in ctx(out)
     saved = json.loads((tmp_path / "state" / "s1.prompt.json").read_text())
     assert saved["prompt"] == "tighten the intro of section 2"
+    assert not (proj / ".work" / "requests.md").exists() or "RQ1" not in (proj / ".work" / "requests.md").read_text()
+
+
+def test_prefix_is_a_commitment(env, tmp_path, proj):
+    out = submit(env, tmp_path, "quick: tighten the intro of section 2")
+    assert "Commitment" in ctx(out) and "request.py record --session s1" in ctx(out)
+    assert "Conversation:" not in ctx(out)
+
+
+def test_record_with_agreed_scope(env, tmp_path, proj):
+    submit(env, tmp_path, "yes, write it up")
+    r = subprocess.run([sys.executable, str(REQ), "--root", str(proj), "record", "--session", "s1", "--slug", "overlap",
+                        "--title", "write up overlap lemma", "--scope", "state lemma 3 for 80 percent overlap"],
+                       capture_output=True, text=True, env=env)
+    assert r.returncode == 0, r.stderr
+    b = (proj / "resources" / "BRIEF.md").read_text()
+    assert "yes, write it up" in b and "Agreed in discussion: state lemma 3 for 80 percent overlap" in b
 
 
 def test_raw_bypasses_the_harness(env, tmp_path, proj):
@@ -123,15 +140,16 @@ def test_commands_and_rw_loop_are_not_requests(env, tmp_path, proj):
     assert "request.py record" not in ctx(out)
 
 
-def test_session_start_reminds_direct_mode(env, proj):
+def test_session_start_announces_conversation_mode(env, proj):
     (proj / "CLAUDE.md").write_text("# Project\n\n## Build\n\nx\n")
     out = ctx(hook(env, "session-start", {"session_id": "s1", "source": "startup"}))
-    assert "Direct mode" in out and "project_update.py" in out
+    assert "Conversation mode" in out and "project_update.py" in out
+    (proj / ".work" / "state.md").write_text("# State\n\n- playbook: new-paper\n- stage: 5 (S5 Properties)\n")
     subprocess.run([sys.executable, str(UPD), "--root", str(proj)], check=True, capture_output=True)
     out = ctx(hook(env, "session-start", {"session_id": "s2", "source": "startup"}))
-    assert "Direct mode" in out and "project_update.py" not in out
+    assert "Conversation mode" in out and "project_update.py" not in out
     out = ctx(hook(env, "session-start", {"session_id": "s3", "source": "startup"}, RW_LOOP="1"))
-    assert "Direct mode" not in out
+    assert "Conversation mode" not in out
 
 
 # ---------- record ----------
@@ -306,12 +324,12 @@ def test_project_update_is_idempotent(env, proj):
     r = subprocess.run([sys.executable, str(UPD), "--root", str(proj)], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     md = (proj / "CLAUDE.md").read_text()
-    assert md.index("## Direct mode") < md.index("## Build")
+    assert md.index("## Working mode") < md.index("## Build")
     assert (proj / ".work" / "requests.md").is_file()
     assert "| A request that changes the scope or a deliverable | blocking |" in (proj / ".work" / "approvals.md").read_text()
     assert "- request:" in (proj / ".work" / "briefs" / "_template.md").read_text()
     log = subprocess.run(["git", "-C", str(proj / ".work"), "log", "-1", "--format=%s"], capture_output=True, text=True)
-    assert log.stdout.strip() == "add request registry"
+    assert log.stdout.strip() == "update workflow files to the current templates"
     again = subprocess.run([sys.executable, str(UPD), "--root", str(proj)], capture_output=True, text=True)
     assert again.stdout.strip() == "up to date"
     assert (proj / "CLAUDE.md").read_text() == md
@@ -365,3 +383,19 @@ def test_session_start_lists_unprocessed_resources(env, proj):
     assert "edited resources/BRIEF.md" in out
     out = ctx(hook(env, "session-start", {"session_id": "s2", "source": "startup"}, RW_LOOP="1"))
     assert "Unprocessed inputs" not in out
+
+
+def test_project_update_adds_agenda_and_swaps_direct_mode(env, proj):
+    (proj / "CLAUDE.md").write_text("# Project\n\n## Direct mode\n\nold text\n\n## Build\n\nmake\n")
+    (proj / ".work" / "state.md").write_text("# State\n\n- playbook: new-paper\n- stage: 5 (S5 Properties)\n")
+    (proj / ".work" / ".gitignore").write_text(".rw/\n.DS_Store\n")
+    r = subprocess.run([sys.executable, str(UPD), "--root", str(proj)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    md = (proj / "CLAUDE.md").read_text()
+    assert "## Direct mode" not in md and "old text" not in md and md.index("## Working mode") < md.index("## Build")
+    t = (proj / ".work" / "threads.md").read_text()
+    assert "## T4 | Model | done" in t and "## T5 | Properties | committed" in t
+    assert (proj / ".work" / "ideas.md").is_file() and (proj / ".work" / "sessions" / "README.md").is_file()
+    assert "issues/probes/" in (proj / ".work" / ".gitignore").read_text()
+    again = subprocess.run([sys.executable, str(UPD), "--root", str(proj)], capture_output=True, text=True)
+    assert again.stdout.strip() == "up to date" and (proj / "CLAUDE.md").read_text() == md

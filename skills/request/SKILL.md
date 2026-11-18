@@ -1,11 +1,12 @@
 ---
 name: request
-description: Direct mode of a research workflow project (.work/). Handles one prompt the human typed in a plain claude session as a request - record it in resources/BRIEF.md with its attachments, assess its impact on the contract, model and claims, execute it through producers and proportional gates, report a short packet, commit in both repos, then wait. Load for every typed prompt in such a project unless it starts with raw: or /. Not under rw.
+description: Commitment in a research workflow project (.work/). Runs one piece of work the human committed in a plain claude session (asked for it, accepted the session's offer, or typed a quick: or full: prompt) as a request - record it in resources/BRIEF.md with its attachments and the agreed scope, assess its impact on the contract, model, claims and agenda, execute it through producers and proportional gates, report a short packet, commit in both repos, then wait. Not for discussion (converse skill). Not under rw.
 ---
 
 # Request
 
-You are the orchestrator for one request. The human typed it; they are present. The orch skill's rules hold
+You are the orchestrator for one request: work the human committed. They are present. Discussion before it was free
+(`converse` skill); from here on the work is recorded and checked. The orch skill's rules hold
 (`~/dotclaude/skills/orch/SKILL.md`: "You never", "Two repos", "Asking the human"), except its procedure: you run this one.
 Load `model-routing`, `review-gates` and `commit-style` when step 3 dispatches or commits.
 Script: `R=~/dotclaude/scripts/request.py` (`python3 $R ...`, from the project root).
@@ -16,7 +17,9 @@ budgets, tiers, effort, rounds or file formats. A `raw:` prompt never reaches th
 ## 1. Record
 
 Before anything else, run the record command the prompt hook gave you:
-`python3 $R record --session <id> --slug <2-4 word slug> --title "<one-line title>"`.
+`python3 $R record --session <id> --slug <2-4 word slug> --title "<one-line title>" [--scope "<agreed scope>"]`.
+It records the human's last prompt verbatim. When the commitment came out of a discussion ("yes, do it"), pass `--scope`
+with the scope agreed in the discussion, in one or two sentences, so the record stands on its own.
 A prompt that only continues the request in progress (an answer to your question, a correction, "also do X to it") is
 `--follow-up RQ<n>`: same request, text appended. If the hook gave no command (it failed), write the prompt verbatim to
 a scratch file and pass `--text-file`.
@@ -37,7 +40,11 @@ Workspace files the prompt names inside the project are references, not attachme
    (Recommended)" or "After the stage". After: `python3 $R close RQ<n> --status deferred --summary "<why>"`, add it to
    `state.md` "Next actions" (`RQ<n> deferred until <stage> is done`), commit, and stop (step 5). The next `/orch`
    session runs deferred requests at its stage end. No conflict: say nothing about it.
-3. Impact. Name every R-, N-, P-, A- and C-ID the request touches, and the deliverables (DL-IDs).
+3. Impact. Name every R-, N-, P-, A- and C-ID the request touches, the deliverables (DL-IDs) and the threads (T-IDs).
+   - An agenda change (add, reorder, park, resume or drop a thread): apply it with `~/dotclaude/scripts/agenda.py`
+     (`--by human --reason "<the human's words>"`) after the checks below; it needs no gates. Reorder, park, resume, a new
+     thread inside the scope, or dropping a thread no R- or DL-ID needs: logged. Anything that adds or drops a requirement or
+     deliverable is a scope change (next item) first. A new thread that is work to do now is also executed (step 3).
    - Changes the scope or a deliverable (adds, drops or reshapes a requirement or deliverable, its format or due date,
      or crosses an N-row): blocking card. `python3 $R raise RQ<n> --affects <IDs> --question "<one sentence?>" --reason
      "<line>" --scope-change | --deliverable-change`, commit, ask it now (`decisions.py compress D<n>`), record the

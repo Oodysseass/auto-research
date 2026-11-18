@@ -56,7 +56,10 @@ Never end the session to ask.
    Mark main theorems or headline results in the question or requirements, so routing can find them.
    Copy `ai_tools_allowed` from the brief's Constraints (client); default `claude, codex`.
 11. Leave `.work/approvals.md` (Class table) at its defaults unless the human says otherwise.
-12. Pick the playbook (same name as the type unless the human says otherwise). Copy its stage list into `state.md` as next actions; set stage 1.
+12. Pick the playbook (same name as the type unless the human says otherwise). Seed the agenda from it:
+    `python3 ~/dotclaude/scripts/agenda.py seed --playbook <name>` writes `.work/threads.md`, one `committed` thread per stage,
+    in playbook order. Fill each thread's `covers` with the R- and DL-IDs it serves (`agenda.py set T<n> covers=...`). Set
+    `state.md` `- playbook:` and `- stage: T1 (S1 <title>)`. The human reorders, adds, parks or drops threads later (`/agenda`).
 13. Fill `.work/glossary.md` with terms and macros found in `resources/` (existing `.tex` macros, SoW terms). Leave `model.md` to the modeler.
 14. Resources manifest, after the last addendum to `resources/BRIEF.md`: `python3 ~/dotclaude/scripts/resources.py init`.
     It lists every file in `resources/` with its sha256, size and date seen. From now on `resources/` is append-only: `/orch` reports
@@ -64,10 +67,11 @@ Never end the session to ask.
 15. Append to `decisions.md`: the classification and playbook, with a one-line reason (`class: blocking`, card `D1`).
     Commit in the `.work` repo (`git -C .work add -A && git -C .work commit`), message per the `commit-style` skill
     ("add contract and playbook"). Nothing is committed in the project repo, and no branch is created.
-16. Approval (blocking): write card `D1` ("Approve the contract and the playbook stages?"; options approve / change scope / change
-    playbook). Show the contract and the playbook stages in chat, then ask with `decisions.py compress D1`.
+16. Approval (blocking): write card `D1` ("Approve the contract and the agenda?"; options approve / change scope / change
+    agenda). Show the contract and the agenda (`agenda.py list`) in chat, then ask with `decisions.py compress D1`.
     Record the answer: `decisions.py accept D1 --option <x>`, a line in `approvals.md` (Log) with the commit
-    (`python3 ~/dotclaude/scripts/repos.py rev`), and the contract's Approval section. Commit in the `.work` repo ("approve contract"). Then tell the human: run `rw` to start the workflow.
+    (`python3 ~/dotclaude/scripts/repos.py rev`), and the contract's Approval section. Commit in the `.work` repo ("approve contract"). Then tell the human: a plain
+    `claude` session here is a discussion with the project's context, `/agenda` changes the plan, and `rw` works through the agenda.
 
 ## Classification
 
@@ -97,5 +101,6 @@ The orchestrator turns one stage into one or more briefs from `.work/briefs/_tem
 Common to all playbooks:
 - Approval points come from `approvals.md`, not from the playbook. A stage marked "G5" asks for approval with the class `approvals.md`
   gives that event: `blocking` asks at once (with a packet), `checkpoint` proceeds provisionally and asks at the next checkpoint.
-- One stage per orchestrator session. `rw` starts the sessions in a loop.
-- A stage is done when every brief of the stage has converged at its gates. The orchestrator then advances `state.md`.
+- The playbook seeds the agenda (`.work/threads.md`): one thread per stage. The agenda, not the playbook, sets the order.
+- One thread per orchestrator session. `rw` starts the sessions in a loop.
+- A thread is done when its goal is met and every brief has converged at its gates. The orchestrator marks it done in the agenda.

@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""Requests typed in direct mode in a research workflow project (.work/). Stdlib only.
+"""Commitments (requests) in a research workflow project (.work/). Stdlib only.
 
-In a plain `claude` session in a project with `.work/`, every prompt is a request handled by the `request` skill, unless it
-starts with `raw:` or `/`. The UserPromptSubmit hook saves the prompt (rw_hooks.py); this script records it, picks the gates,
+A plain `claude` session in a project with `.work/` is a conversation. Work becomes a request when the human commits it
+(asks for it, accepts the session's offer, or types a `quick:` or `full:` prompt); the `request` skill runs it.
+The UserPromptSubmit hook saves every typed prompt (rw_hooks.py); this script records it, picks the gates,
 writes scope cards, closes it and traces changes back to it. Registry: .work/requests.md, one block per request (RQ<n>).
 The text of each request goes to resources/BRIEF.md under a dated "Requests" heading. Attachments go to
 resources/<date>-<slug>/ and into .work/resources.manifest (origin `request`, handled RQ<n>).
 
 Usage (run from the project root, or pass --root):
-  request.py record --slug S --title T [--session ID] [--transcript PATH] [--text-file F] [--follow-up RQ<n>]
+  request.py record --slug S --title T [--session ID] [--transcript PATH] [--text-file F] [--scope TEXT] [--follow-up RQ<n>]
         record the prompt: the text saved by the hook for the session (or --text-file), with its images and documents from
         the transcript. Pasted blocks over PASTE_LINES lines and files outside the project named by @path or by an
         absolute path go to resources/<date>-<slug>/ too. Prints JSON: id, mode, dir, files, warnings.
-        --follow-up: the prompt continues request RQ<n> (an answer, a correction); it is appended to it, no new ID.
+        --scope: the scope agreed in the discussion before the commitment; appended to the recorded text under
+        "Agreed in discussion:". --follow-up: the prompt continues request RQ<n>; it is appended to it, no new ID.
   request.py gates --kind prose|technical [--tex] [--critical] [--mode default|quick|full]
         the brief's `- gates:` and `- critical:` values for a request. prose: G0, G1, G4. technical: G0 to G2 and G4,
         G3 if critical. quick: G0, G1. full: G0 to G4, critical. G0 only with --tex (a .tex file changes).
@@ -59,7 +61,7 @@ KEYS = ("date", "title", "mode", "status", "text", "files", "rev before", "rev a
         "gates", "changed", "commits", "summary")
 LIST_KEYS = ("files", "briefs", "decisions", "claims", "gates", "changed", "commits")
 STATUSES = ("open", "done", "answered", "deferred", "dropped")
-HEADER = ("# Requests\n\nPrompts typed in direct mode. One block per request. Written by "
+HEADER = ("# Requests\n\nWork the human committed (requests). One block per request. Written by "
           "`~/dotclaude/scripts/request.py` only.\nThe text of each request is in `resources/BRIEF.md`, under "
           "\"Requests <date>\", heading `RQ<n>`.\n")
 EXT = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp", "application/pdf": "pdf"}
@@ -78,12 +80,6 @@ def session_key(sid):
 
 def saved_prompt_path(sid):
     return STATE_DIR / f"{session_key(sid)}.prompt.json"
-
-
-def is_direct(prompt):
-    """True if a typed prompt is a request: not raw:, not a slash command, not empty."""
-    s = (prompt or "").lstrip()
-    return bool(s) and not s.startswith("/") and not s.lower().startswith("raw:")
 
 
 def human_entries(transcript_path):
@@ -303,10 +299,12 @@ def brief_edited(root):
     return bool(e) and p.is_file() and resources.sha256(p) != e["sha256"] and not e["anomaly"].startswith("edited")
 
 
-def do_record(root, slug, title, sid, transcript, text_file, follow_up):
+def do_record(root, slug, title, sid, transcript, text_file, follow_up, scope=None):
     if not (Path(root) / ".work").is_dir():
         raise UsageError("no .work/ here: run from the project root")
     text, blocks = load_prompt(sid, transcript, text_file)
+    if scope and scope.strip():
+        text = text.rstrip() + "\n\nAgreed in discussion: " + " ".join(scope.split())
     rid = follow_up or next_id(root)
     old = get(root, rid) if follow_up else None
     warnings = []
@@ -550,7 +548,7 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("record"); p.add_argument("--slug", required=True); p.add_argument("--title", required=True)
     p.add_argument("--session"); p.add_argument("--transcript"); p.add_argument("--text-file")
-    p.add_argument("--follow-up")
+    p.add_argument("--follow-up"); p.add_argument("--scope")
     p = sub.add_parser("gates"); p.add_argument("--kind", choices=("prose", "technical"), required=True)
     p.add_argument("--tex", action="store_true"); p.add_argument("--critical", action="store_true")
     p.add_argument("--mode", choices=("default", "quick", "full"), default="default")
@@ -569,7 +567,7 @@ def main(argv=None):
     root = Path(a.root).resolve()
     try:
         if a.cmd == "record":
-            return do_record(root, a.slug, a.title, a.session, a.transcript, a.text_file, a.follow_up)
+            return do_record(root, a.slug, a.title, a.session, a.transcript, a.text_file, a.follow_up, a.scope)
         if a.cmd == "gates":
             g, crit = gates(a.kind, a.tex, a.critical, a.mode)
             print(f"- gates: {', '.join(g)}\n- critical: {'yes' if crit else 'no'}")

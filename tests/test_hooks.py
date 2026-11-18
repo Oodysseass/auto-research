@@ -284,3 +284,47 @@ def test_import_error_fails_open(tmp_path, env, proj):
     r = subprocess.run([sys.executable, str(broken / "hooks" / "rw_hooks.py"), "stop"], input="{}",
                        capture_output=True, text=True, env=dict(e, CLAUDE_PROJECT_DIR=str(tmp_path / "nowork")))
     assert r.returncode == 0 and r.stdout == "" and r.stderr == ""
+
+
+def ctx(out):
+    return out["hookSpecificOutput"]["additionalContext"]
+
+
+def memory(proj):
+    (proj / ".work" / "threads.md").write_text(
+        "# Threads\n\n## T1 | Model | committed\n- goal: g\n- stage: S4\n- covers: none\n- next: none\n- added: d (intake)\n")
+    (proj / ".work" / "ideas.md").write_text(
+        "# Ideas\n\n## I1 | idea | open\n- text: quorum intersection survives partial overlap of validator lists\n"
+        "- source: d\n\n## I2 | question | open\n- text: does liveness need global stabilization time\n- source: d\n")
+    (proj / ".work" / "deadends.md").write_text("# Dead ends\n\n- 2026-11-01 | reduce to Dolev-Strong broadcast | needs signatures | I1\n")
+
+
+def test_digest_on_first_prompt_then_relevant_items(env, proj):
+    memory(proj)
+    start(env)
+    first = ctx(hook(env, "prompt", {"session_id": "s1", "prompt": "let us think about the model"}))
+    assert "# Project memory" in first and "T1 Model" in first and "I2 (question)" in first and "Dolev-Strong" in first
+    second = ctx(hook(env, "prompt", {"session_id": "s1", "prompt": "what about partial overlap of the validator lists"}))
+    assert "# Project memory" not in second and "Related in project memory" in second and "I1" in second
+    unrelated = ctx(hook(env, "prompt", {"session_id": "s1", "prompt": "hello there"}))
+    assert "Related" not in unrelated and "Conversation:" in unrelated
+    (proj / ".work" / "ideas.md").write_text((proj / ".work" / "ideas.md").read_text() +
+                                             "\n## I3 | idea | open\n- text: new idea\n- source: d\n")
+    assert "# Project memory" in ctx(hook(env, "prompt", {"session_id": "s1", "prompt": "next"}))
+    hook(env, "session-start", {"session_id": "s1", "source": "compact"})
+    assert "# Project memory" in ctx(hook(env, "prompt", {"session_id": "s1", "prompt": "after compaction"}))
+
+
+def test_session_end_stub_and_capture_offer(env, proj, tmp_path):
+    start(env)
+    hook(env, "session-end", {"session_id": "s1", "transcript_path": "/t/s1.jsonl"})
+    assert not list((proj / ".work").glob("sessions/*-stub.md"))  # no conversation prompt yet
+    hook(env, "prompt", {"session_id": "s1", "prompt": "let us discuss liveness"})
+    hook(env, "session-end", {"session_id": "s1", "transcript_path": "/t/s1.jsonl"})
+    stubs = list((proj / ".work").glob("sessions/*-stub.md"))
+    assert len(stubs) == 1 and "/t/s1.jsonl" in stubs[0].read_text()
+    out = ctx(hook(env, "session-start", {"session_id": "s2", "source": "startup"}))
+    assert "Capture pending" in out and "/t/s1.jsonl" in out
+    hook(env, "prompt", {"session_id": "s3", "prompt": "x"}, RW_LOOP="1")
+    hook(env, "session-end", {"session_id": "s3"}, RW_LOOP="1")
+    assert len(list((proj / ".work").glob("sessions/*-stub.md"))) == 1

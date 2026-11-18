@@ -28,8 +28,9 @@ def test_wstatus_runs_every_section_without_a_shell(tmp_path):
     r = subprocess.run([sys.executable, str(WSTATUS), "--root", str(p)], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     s = sections(r.stdout)
-    assert list(s) == ["state", "approvals log", "latest handoff", "claims", "decisions", "issues", "requests", "repos",
-                       "resources"]
+    assert list(s) == ["state", "agenda", "approvals log", "latest handoff", "claims", "ideas", "pending captures",
+                       "decisions", "issues", "requests", "repos", "resources"]
+    assert s["agenda"] == "no threads" and s["ideas"] == "(no .work/ideas.md)" and s["pending captures"] == "none"
     assert s["claims"] == "draft 2, verified 1"
     assert s["issues"].splitlines()[-1] == "open issues: blocking 0, major 1, minor 0"
     assert s["repos"].endswith("(exit 1)")  # not a git repo: reported in its section, the others still ran

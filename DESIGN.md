@@ -27,18 +27,19 @@ The workflow makes Claude Code a research partner with a team of specialist agen
 
 | Mode | Start | Behavior |
 |---|---|---|
-| Conversation (default, *not built*) | `claude` in a project | research discussion with project context; quick probes allowed; capture at natural breaks |
-| Commitment | say "write it up", "prove it", "restructure", or accept the session's offer (*not built*: today every typed prompt is a commitment, see below) | request flow (`request` skill): record, assess impact, brief, agents, gates, packet |
-| Autopilot | `rw` | works through committed threads (*not built*: today the playbook's stages, one stage per session) and deferred requests; restarts sessions itself; asks blocking decisions and checkpoints in session with a notification and continues; at the subscription limit waits for the reset and resumes; stops on project done, an error, a session that ends without a handoff, or a stage or session cap given at start |
+| Conversation (default) | `claude` in a project | research discussion with project context (`converse` skill); quick probes allowed; capture at natural breaks |
+| Commitment | say "write it up", "prove it", "restructure", "drop X", "make Y first", accept the session's offer, or prefix `quick:` / `full:` | request flow (`request` skill): record with the agreed scope, assess impact, brief, agents, gates, packet |
+| Agenda | `/agenda`, or ask in conversation | show the threads in priority order; add, reorder, park, resume, drop. Scope changes need a blocking card |
+| Autopilot | `rw` | works through the agenda: the first committed thread, one thread per session, re-reading the agenda each session; and deferred requests; restarts sessions itself; asks blocking decisions and checkpoints in session with a notification and continues; at the subscription limit waits for the reset and resumes; stops on project done, an error, a session that ends without a handoff, or a stage or session cap given at start |
 | Outside the harness | prefix `raw:` or a folder without `.work/` | plain Claude Code. In a `.work/` project, `raw:` skips the request flow only: the rules card, digest and Stop and PreCompact guards still apply |
 
 Prefixes `quick:` and `full:` override the default gate depth of a commitment.
 
-**What runs today (direct mode).** Every prompt typed in a plain session in a `.work/` project, unless it starts with `raw:` or `/`, is a request handled by the `request` skill. The hooks, the global `CLAUDE.md` and each project's `CLAUDE.md` ("Direct mode" section, installed by `scripts/project_update.py`) say so. The `quick:` and `full:` prefixes select the gate depth (section 6); words elsewhere in a prompt do not. Conversation first (history entry 10) replaces this; it is not built.
+**Agenda.** `.work/threads.md` lists the project's threads of work in priority order, with status exploring, committed, parked, done or dropped. Intake seeds it from the playbook, one thread per stage; from then on the agenda, not the playbook, sets the order. `scripts/agenda.py` is its only writer and logs every change in `decisions.md`. Reordering, parking, resuming, adding inside scope, and dropping a thread no requirement or deliverable needs are logged; adding or dropping a requirement or deliverable is a scope change and asks a blocking card first.
 
-**Quick probes** (*not built*): cheap checks during conversation (counterexample attempt, literature check, model-conformance check). Labeled "probe, unverified". They never change claim statuses and are kept only if captured.
+**Quick probes**: cheap checks during conversation (counterexample attempt, literature check, model-conformance check), one cheap dispatch each, output in `.work/issues/probes/` (not committed). Labeled "probe, unverified". They never change claim statuses and are kept only if captured.
 
-**Capture** (*not built*): a multi-select dialog listing ideas, open questions, dead ends, decisions and thread changes from the discussion. Only ticked items are saved, plus a one-page session summary. At exit a stub is written; the dialog is offered at the next session start.
+**Capture** (`capture` skill, `/capture`, `scripts/capture.py`): a multi-select dialog listing ideas, open questions, dead ends, decisions and new threads from the discussion. Only ticked items are saved, plus a one-page session summary. A session that ends without a capture leaves a stub; the next session offers the dialog from its transcript.
 
 ## 4. Project layout
 
@@ -52,10 +53,10 @@ Prefixes `quick:` and `full:` override the default gate depth of a commitment.
     model.md                    assumptions A1, A2, ... with labels
     glossary.md                 terms, macros, notation for this project
     claims.md                   registry: status draft | provisional | checked | verified | refuted | legacy-unverified
-    threads.md                  lines of inquiry: exploring | parked | committed | done (not built)
-    ideas.md                    ideas and hypotheses with source and status (not built; the open-ended playbook keeps hypotheses.md)
-    state.md                    playbook stage, active brief, project branch, revisions at last handoff, next actions,
-                                pending decisions, requeued briefs; pointers to threads (not built)
+    threads.md                  the agenda, in priority order: exploring | committed | parked | done | dropped
+    ideas.md                    ideas and open questions (I-IDs) with source and status (the open-ended playbook also keeps hypotheses.md)
+    state.md                    current thread, active brief, project branch, revisions at last handoff, next actions,
+                                pending decisions, requeued briefs
     decisions.md, decisions/D<n>.md   log and decision cards
     deadends.md                 failed approaches with reasons
     approvals.md                decision classes, class table, append-only approval log
@@ -64,7 +65,8 @@ Prefixes `quick:` and `full:` override the default gate depth of a commitment.
     usage.tsv                   tokens per dispatch, by brief and stage type (PostToolUse hook)
     .rw/                        session-end marker for rw; ignored by the .work repo's own .gitignore
     briefs/ issues/ packets/ handoffs/ retro/
-    sessions/                   session summaries (not built)
+    issues/probes/              quick probe outputs; ignored by the .work repo
+    sessions/                   session summaries and capture stubs
 ```
 
 - Excludes go in `.git/info/exclude` (never a committed `.gitignore`, which would reveal the workflow), prefixed with the project's subfolder path when the project is not the repo root. They cover `.work/`, `CLAUDE.md`, `.claude/`, `resources/` and build `output/`.
@@ -82,7 +84,7 @@ Dispatched only by the orchestrator (main session). Shared rules in the `agent-p
 - **Summarizer**: writes approval packets. No gate; may write only in `.work/packets/`.
 - **Arbiter**: settles deadlocks; sees both sides.
 - **Mythos variants**: `<base>-mythos.md` for prover, proof-checker, counterexample-hunter, attacker, protocol-designer, question-refiner and arbiter, generated by `scripts/build_mythos_variants.py`. A pre-commit check keeps them in sync once `git config core.hooksPath .githooks` is set in the clone; it checks the working tree, not the index. Needed because the per-call model override accepts only sonnet, opus, haiku, fable.
-- **Orchestrator**: the main session. Under `bin/rw` it runs on Opus 5.5 high; in a plain session (direct mode) it runs on the global default model and effort.
+- **Orchestrator**: the main session. Under `bin/rw` it runs on Opus 5.5 high; in a plain session (a commitment) it runs on the global default model and effort.
 - Reviewer writes are restricted to new files in `.work/issues/` whose names carry the reviewer's own prefix. A PreToolUse hook enforces this for file tools. The orchestrator also runs a `git status` check in both repos around every reviewer and arbiter dispatch (the Codex wrapper runs its own): any other change is reverted and the review discarded; a moved HEAD is reported, never reset, and needs a blocking card. A second violation reruns the reviewer one rung up; a third ends the session with `/handoff error`.
 
 ## 6. Review pipeline
@@ -96,7 +98,7 @@ Dispatched only by the orchestrator (main session). Shared rules in the `agent-p
 | G4 | writing style | style-reviewer |
 | G5 | human | per `approvals.md` |
 
-- Gate depth for a commitment: prose or structure only runs G0, G1, G4; statements, proofs, model or findings run G0 to G4, with G3 for main results and deliverables. G0 runs only when a `.tex` file changed; it compiles the paper's `main.tex` (at the project root, else the shallowest one) after the lint. `quick:` runs G0 and G1 only and never raises a claim status; `full:` runs G0 to G4 and treats the artifact as critical. Under `/orch`, the playbook stage sets the gates.
+- Gate depth for a commitment: prose or structure only runs G0, G1, G4; statements, proofs, model or findings run G0 to G4, with G3 for main results and deliverables. G0 runs only when a `.tex` file changed; it compiles the paper's `main.tex` (at the project root, else the shallowest one) after the lint. `quick:` runs G0 and G1 only and never raises a claim status; `full:` runs G0 to G4 and treats the artifact as critical. Under `/orch`, a thread's playbook stage sets the gates; a thread without a stage uses the commitment rules.
 - Stopping rules (computed by `scripts/review_status.py`, never by the orchestrator from memory): converged, deadlocked, stalled, round limit. One clean round converges; for main theorems, designs and final deliverables G1, G2 and G4 need two, and at G1 and G2 a clean G3 round at the same content counts as the second. "Same content" hashes the artifact plus model, glossary and the claims it depends on; every Review log row carries these hashes, and a clean round without them never converges.
 - Deadlock: `arbiter`, then `arbiter-mythos` (if needs_human or main theorem; for a main theorem its ruling governs), then the human. A producer who rejects an issue again after a reviewer-right ruling goes to the human.
 - `verified` means G1 and G2 (and G3 where required) passed on the same content, by hash. After any edit to LaTeX, pseudocode, the model or the glossary, the regression-checker lists the dependent claims and the orchestrator resets them. A loop that converges while a decision is still provisional leaves its claims `provisional`.
@@ -113,8 +115,8 @@ Dispatched only by the orchestrator (main session). Shared rules in the `agent-p
 
 All hooks live in `hooks/rw_hooks.py`. Except the status line, they do nothing outside a project with `.work/` (found through `$CLAUDE_PROJECT_DIR`, so a session must start at the project folder), and fail open on script errors.
 
-- SessionStart: binding files; the project digest (start of `state.md` and the latest handoff); outside `rw`, the direct-mode instructions, unprocessed files in `resources/`, and open or deferred requests; after compaction, an instruction to hand off and re-read the binding files. Records the baseline that Stop and PreCompact compare against. Pending capture from the previous session: *not built*.
-- UserPromptSubmit: rules card every prompt. Outside `rw`, a prompt not starting with `raw:` or `/` is saved and routed to the `request` skill. Full digest on first prompt, after compaction and when memory changed, and relevant ideas and dead ends otherwise: *not built*.
+- SessionStart: binding files; the project digest (start of `state.md` and the latest handoff); outside `rw`, the conversation-mode note, pending captures, unprocessed files in `resources/`, and open or deferred requests; after compaction, an instruction to hand off and re-read the binding files. Records the baseline that Stop and PreCompact compare against.
+- UserPromptSubmit: rules card every prompt. Outside `rw`: every typed prompt is saved; a `quick:` or `full:` prompt goes to the `request` skill; any other prompt (not `raw:` or `/`) gets the conversation note, plus the full digest (agenda, open questions, ideas, dead ends) on the first prompt, after compaction and when `threads.md`, `ideas.md`, `deadends.md` or `state.md` changed, and otherwise the ideas and dead ends that share words with the prompt.
 - PreCompact: blocks manual compaction with unrecorded work (as for Stop); never blocks auto-compaction (writes a snapshot instead).
 - Stop: blocks only for unrecorded changes to the paper, deliverable or claims: project commits, uncommitted project files this session wrote with file tools (the human's own edits do not count), and `.work/claims.md`. A change is recorded once `state.md` is updated after it. Never for discussion, never for the workflow's own bookkeeping. Under `rw` it also marks the session ended and, on an `/orch` turn, keeps the session from ending while it should ask or wait.
 - PreToolUse on file tools and Bash: reviewer write guard, the summarizer's packets-only guard, and a push guard that refuses pushing `.work` or workflow branches.
@@ -122,7 +124,7 @@ All hooks live in `hooks/rw_hooks.py`. Except the status line, they do nothing o
 - PostToolUse on Agent: logs tokens per dispatch to `.work/usage.tsv` and a global log; near the context limit, tells the orchestrator to finish the round and hand off.
 - StopFailure on the usage limit: snapshot handoff if work is unrecorded, end marker with the reset time for `rw`, notification.
 - Status line (every project): model, context use, current stage; caches the data the PostToolUse and StopFailure hooks need.
-- SessionEnd: capture stub (*not built*).
+- SessionEnd: outside `rw`, a capture stub when the session had conversation prompts and no capture.
 
 ## 9. Writing and domain knowledge
 
@@ -163,11 +165,12 @@ Decisions that changed the design, with reasons. Append new entries.
 9. Subfolder projects supported: real projects live inside larger repos.
 10. Direct mode (every prompt a request) replaced by conversation first: research is mostly discussion; tasks emerge from it.
 11. Design overview wired into the tooling: `.claude/CLAUDE.md` loads this file for sessions in this repo, and the `workflow-guide` skill answers questions about the workflow from it in any project: intent must stay next to the code and be answerable without opening files.
+12. Conversation-first mode built, and an editable agenda (`threads.md`) replaces the fixed playbook stage order for `rw`: research intentions change during a project (new directions, reprioritised or dropped work), and the human must be able to reshape the plan in conversation without editing the contract.
 
 ## 13. Status
 
-- Built and tested: agents, gates, Codex wrapper, hooks, lint, review status, interaction redesign, commit style, repo separation, subfolder support, direct mode.
-- Not built: conversation-first mode (history entry 10): conversation as default, commitment on request or offer, quick probes, capture, threads, ideas, session summaries, the SessionEnd hook, digest and idea injection on prompts. Direct mode runs in its place.
+- Built and tested: agents, gates, Codex wrapper, hooks, lint, review status, interaction redesign, commit style, repo separation, subfolder support, conversation-first mode (conversation, commitments, probes, capture, digest), the agenda.
+- Not yet tried in a live project: conversation-first mode and the agenda (unit tests only); the migrated project needs `project_update.py` once.
 - Pilot: first run exposed the interaction problems (history entry 5). Rerun of the proof stages (false lemma, forced deadlock) pending; until reviewed, `verified` is not fully trusted and the owner reads results himself.
 - First real project migrated (a client project in a subfolder of a larger repo).
 - Known open issues at time of writing: template placeholder claim treated as real.

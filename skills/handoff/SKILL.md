@@ -7,7 +7,7 @@ argument-hint: "<stage-done | context | project-done | error> [reason]"
 # Handoff
 
 Run from the project root. Do it even if the session did little: the next orchestrator knows only what is on disk.
-Outcome: the first word of `$ARGUMENTS` (`stage-done`, `context`, `project-done` or `error`); default `context` if the stage is not done.
+Outcome: the first word of `$ARGUMENTS` (`stage-done`, `context`, `project-done` or `error`); default `context` if the thread's work for this session is not done.
 
 Two repos: the project repo (paper, code) and the `.work` repo (`~/dotclaude/scripts/repos.py`).
 
@@ -17,7 +17,7 @@ Two repos: the project repo (paper, code) and the `.work` repo (`~/dotclaude/scr
    per artifact with reports), decision cards asked, answered, provisional or reversed (`decisions.py list`), requeued briefs.
 2. Write `.work/handoffs/<YYYYMMDD-HHMM>.md` from `.work/handoffs/_template.md`. Every section filled; `none` where empty.
    "Must not forget" holds only what no other `.work/` file records. No token counts or budgets: usage is in `.work/usage.tsv`.
-3. Update `.work/state.md`: `updated`, `stage`, `active brief`, `project branch`, `revs at last handoff` (`repos.py rev`, taken after
+3. Update `.work/state.md`: `updated`, `stage` (the current thread, `<T-ID> (<stage ID> <title>)`), `active brief`, `project branch`, `revs at last handoff` (`repos.py rev`, taken after
    the paper commits of step 5), `last handoff`, "Next actions", "Pending decisions", "Requeued".
 4. If a snapshot handoff `*-auto-*.md` exists from this session, fold its facts into the new handoff. Keep the snapshot file.
 5. Commit in the `.work` repo: `git -C .work add -A && git -C .work commit -m "update project state after <what the session did>"`,

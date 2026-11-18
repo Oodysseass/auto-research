@@ -3,8 +3,8 @@
 
 Usage (run from the project root, or pass --root):
   wstatus.py
-Prints one section per source, each headed `## <name>`: state, approvals log, latest handoff, claims (count per
-status), decisions, issues (review_status.py --all: every artifact and legacy file), requests, repos, resources.
+Prints one section per source, each headed `## <name>`: state, agenda, approvals log, latest handoff, claims (count per
+status), ideas (open ideas and questions), pending captures, decisions, issues (review_status.py --all: every artifact and legacy file), requests, repos, resources.
 A source that fails prints its output and `(exit N)` in its section; the other sections still run. Always exits 0 unless the root has no .work/ (2).
 """
 import argparse
@@ -45,6 +45,15 @@ def latest_handoff(root):
     return files[-1] if files else "none"
 
 
+def open_ideas(root):
+    try:
+        text = (root / ".work" / "ideas.md").read_text()
+    except OSError:
+        return "(no .work/ideas.md)"
+    found = re.findall(r"(?m)^## (I\d+) \| (\S+) \| open\s*\n- text: (.*)$", text)
+    return "\n".join(f"{i} ({k}): {t}" for i, k, t in found) or "none"
+
+
 def claims_by_status(root):
     sys.path.insert(0, str(SCRIPTS))
     import review_status
@@ -67,9 +76,12 @@ def main(argv=None):
     except OSError:
         state = "(no .work/state.md)"
     section("state", state)
+    section("agenda", script(root, "agenda.py", "list"))
     section("approvals log", approvals_log(root))
     section("latest handoff", latest_handoff(root))
     section("claims", claims_by_status(root))
+    section("ideas", open_ideas(root))
+    section("pending captures", script(root, "capture.py", "pending"))
     section("decisions", script(root, "decisions.py", "list"))
     issues = root / ".work" / "issues"
     section("issues", script(root, "review_status.py", str(issues), "--all") if issues.is_dir() else "(no .work/issues/)")

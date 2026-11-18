@@ -3,7 +3,7 @@
 File name: `briefs/<id>.md`, with `<id>` = `<stage>-<short-slug>`, e.g. `S4-safety-lemma`.
 
 - stage: <playbook stage>
-- request: <RQ-ID if the brief serves a direct-mode request | none>
+- request: <RQ-ID if the brief serves a request | none>
 - status: <open | done | escalated | requeued>
 - stage type: <literature | refine | model | properties | statements | design | proof-lemma | proof-main | attacks | exposition | report | review | other>
 - assigned agent: <agent name>
