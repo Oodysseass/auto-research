@@ -7,6 +7,13 @@ Usage:
 Gates and G2 reviewers come from the brief's `- gates:` field, e.g. `G0, G1, G2[assumption-auditor], G3`
 (default: G1, G2 with all three G2 reviewers, G3 if critical), plus any gate that has reports.
 
+  review_status.py <issues-dir> <artifact-slug> --hashes
+      Prints the Review log `hashes` cell for the current content: each file in the brief's
+      `- artifact files:` field, .work/model.md, .work/glossary.md, and `claims`, a hash of the
+      claims.md entries in the brief's `- claims:` field and their transitive depends_on (content keys
+      only: label, type, statement, assumptions, depends_on). Any change to these between two clean
+      rounds is an edit: the rounds are not consecutive and a clean round is voided.
+
 Reads every report, producer response and arbiter ruling for the slug in <issues-dir>
 (file names per templates/project/.work/issues/README.md), and the brief whose
 `- artifact slug:` field equals the slug (default: <issues-dir>/../briefs/*.md).
@@ -110,6 +117,78 @@ def blob_hash(path):
     return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
 
 
+CONTEXT_FILES = (".work/model.md", ".work/glossary.md")
+CLAIM_CONTENT_KEYS = ("label", "type", "statement", "assumptions", "depends_on")
+
+
+def parse_claims(path):
+    """claims.md -> {C-ID: {key: value}}."""
+    claims, cur = {}, None
+    if not Path(path).is_file():
+        return claims
+    for line in Path(path).read_text().splitlines():
+        m = re.match(r"^## (C\d+)\s*$", line)
+        if m:
+            cur = claims.setdefault(m.group(1), {})
+            continue
+        if line.startswith("## "):
+            cur = None
+            continue
+        m = re.match(r"^- ([a-z_]+):\s*(.*?)\s*$", line)
+        if cur is not None and m:
+            cur[m.group(1)] = m.group(2)
+    return claims
+
+
+def claim_closure(claims, ids):
+    seen, todo = set(), list(ids)
+    while todo:
+        c = todo.pop()
+        if c in seen:
+            continue
+        seen.add(c)
+        deps = claims.get(c, {}).get("depends_on", "none")
+        todo += [d for d in re.findall(r"C\d+", deps) if d not in seen]
+    return sorted(seen, key=lambda c: int(c[1:]))
+
+
+def claims_hash(root, ids):
+    """Hash of the content keys of the claims `ids` and their transitive dependencies.
+    Bookkeeping keys (status, verified_by, refuted_by, notes) are left out, so status updates do not count as edits."""
+    claims = parse_claims(Path(root) / ".work" / "claims.md")
+    parts = []
+    for c in claim_closure(claims, ids):
+        entry = claims.get(c)
+        body = "missing" if entry is None else "\n".join(f"{k}: {entry.get(k, '')}" for k in CLAIM_CONTENT_KEYS)
+        parts.append(f"## {c}\n{body}")
+    return hashlib.sha1("\n".join(parts).encode()).hexdigest()
+
+
+def split_list(field):
+    return [x.strip().strip("`") for x in re.split(r"[,;]\s*", field or "") if x.strip() and x.strip().lower() != "none"]
+
+
+def current_hash(root, key, claim_ids):
+    if key == "claims":
+        return claims_hash(root, claim_ids)
+    p = Path(root) / key
+    return blob_hash(p) if p.is_file() else "missing"
+
+
+def content_hashes(root, fields):
+    """The review content of an artifact: its files, model.md, glossary.md, and its claims with dependencies."""
+    files = split_list(fields.get("artifact files"))
+    if not files:
+        raise ValueError("the brief has no `- artifact files:` field")
+    ids = split_list(fields.get("claims"))
+    keys = files + list(CONTEXT_FILES) + (["claims"] if ids else [])
+    return {k: current_hash(root, k, ids) for k in keys}
+
+
+def format_hashes(h):
+    return "; ".join(f"{k}={v[:12]}" for k, v in h.items())
+
+
 def same_hash(a, b):
     if not a or not b:
         return False
@@ -125,7 +204,7 @@ def same_content(h1, h2):
 # ---------- analysis ----------
 
 class Ctx:
-    def __init__(self, reports, responses, rulings, critical, main, budget, log, root):
+    def __init__(self, reports, responses, rulings, critical, main, budget, log, root, claim_ids=()):
         self.reports, self.responses, self.rulings = reports, responses, rulings
         self.critical, self.main, self.budget, self.root = critical, main, budget, root
         self.hashes = {}
@@ -136,11 +215,9 @@ class Ctx:
         self.current = {}
         self.warnings = []
         if not self.hashes:
-            self.warnings.append("no artifact hashes in the brief's Review log: edit and stall checks skipped")
-        files = {f for h in self.hashes.values() for f in h}
-        for f in files:
-            p = Path(root) / f
-            self.current[f] = blob_hash(p) if p.is_file() else "missing"
+            self.warnings.append("no content hashes in the brief's Review log: edit and stall checks skipped")
+        for key in {k for h in self.hashes.values() for k in h}:
+            self.current[key] = current_hash(root, key, claim_ids)
         self.canon = {}
         for streams in reports.values():
             for rep in streams.values():
@@ -312,7 +389,7 @@ def analyse(issues_dir, slug, brief=None):
     critical = yes("critical") or main
     budget = min(MAX_ROUNDS, rounds) if rounds else MAX_ROUNDS
     root = Path(issues_dir).resolve().parent.parent
-    ctx = Ctx(reports, responses, rulings, critical, main, budget, log, root)
+    ctx = Ctx(reports, responses, rulings, critical, main, budget, log, root, split_list(fields.get("claims")))
     required = parse_gates(fields.get("gates"))
     if not required:
         required = {"G1": None, "G2": None, **({"G3": None} if critical else {})}
@@ -348,10 +425,23 @@ def main(argv=None):
     ap.add_argument("slug")
     ap.add_argument("--brief")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--hashes", action="store_true", help="print the Review log `hashes` cell for the current content and exit")
     a = ap.parse_args(argv)
     if not Path(a.issues_dir).is_dir():
         print(f"review_status: {a.issues_dir} is not a directory", file=sys.stderr)
         return 2
+    if a.hashes:
+        briefs = [Path(a.brief)] if a.brief else find_briefs(a.issues_dir, a.slug)
+        if not briefs:
+            print(f"review_status: no brief with artifact slug {a.slug}", file=sys.stderr)
+            return 2
+        try:
+            h = content_hashes(Path(a.issues_dir).resolve().parent.parent, parse_brief(briefs[-1])[0])
+        except ValueError as e:
+            print(f"review_status: {e}", file=sys.stderr)
+            return 2
+        print(format_hashes(h))
+        return 0
     res = analyse(a.issues_dir, a.slug, a.brief)
     if a.json:
         print(json.dumps(res, indent=2))

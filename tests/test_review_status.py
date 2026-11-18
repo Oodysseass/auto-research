@@ -11,6 +11,7 @@ import review_status  # noqa: E402
 from validate_issue_json import check  # noqa: E402
 
 FIX = ROOT / "tests" / "fixtures" / "review_status"
+sys.path.insert(0, str(FIX))
 SCHEMAS = {n: json.loads((ROOT / "schemas" / f"{n}.schema.json").read_text())
            for n in ("issue-report", "issue-response", "arbiter-ruling")}
 
@@ -173,3 +174,46 @@ def test_brief_gates_field_names_g2_reviewers(tmp_path):
     res = review_status.analyse(case / ".work" / "issues", "lemma")
     assert res["overall"]["status"] == "converged", res["overall"]
     assert review_status.parse_gates("G0, G2[a b], G3") == {"G0": None, "G2": ["a", "b"], "G3": None}
+
+
+# Review context: model.md, glossary.md, and the claims.md entries of the artifact's claims and dependencies.
+
+def test_model_changed_between_clean_rounds_breaks_consecutive():
+    res = status("critical-model-changed-between-clean-rounds")
+    assert res["gates"]["G1"]["status"] == "open"
+    assert res["gates"]["G1"]["action"] == "next-gate"
+
+
+def test_dependency_claim_changed_between_clean_rounds_breaks_consecutive():
+    res = status("critical-dependency-changed-between-clean-rounds")
+    assert res["gates"]["G1"]["status"] == "open"
+
+
+def test_claim_status_change_is_not_an_edit():
+    assert overall("critical-status-changed-between-clean-rounds") == ("converged", "none", None, None)
+
+
+def test_model_changed_after_clean_round_voids_it():
+    res = status("model-changed-after-clean")
+    assert res["overall"]["gate"] == "G1" and "voided" in res["overall"]["reason"]
+
+
+def test_claims_hash_covers_dependencies_only(tmp_path):
+    from make_fixtures import materialize
+    materialize(tmp_path, "A", "A", "A")
+    base = review_status.claims_hash(tmp_path, ["C1"])
+    cl = tmp_path / ".work" / "claims.md"
+    cl.write_text(cl.read_text().replace("- statement: Unrelated.", "- statement: Changed."))
+    assert review_status.claims_hash(tmp_path, ["C1"]) == base  # C3 is not a dependency
+    cl.write_text(cl.read_text().replace("- depends_on: C2", "- depends_on: C2, C3"))
+    assert review_status.claims_hash(tmp_path, ["C1"]) != base
+    assert review_status.claim_closure(review_status.parse_claims(cl), ["C1"]) == ["C1", "C2", "C3"]
+
+
+def test_cli_hashes_prints_review_log_cell():
+    out = subprocess.run([sys.executable, str(ROOT / "scripts" / "review_status.py"),
+                          str(FIX / "converged" / ".work" / "issues"), "lemma", "--hashes"], capture_output=True, text=True)
+    cell = out.stdout.strip()
+    assert [k.split("=")[0] for k in cell.split("; ")] == ["paper/lemma.tex", ".work/model.md", ".work/glossary.md", "claims"]
+    brief = (FIX / "converged" / ".work" / "briefs" / "S1-lemma.md").read_text()
+    assert cell in brief

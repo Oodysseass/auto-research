@@ -36,7 +36,7 @@ You are disposable. Everything you know comes from `.work/`, and everything you 
    2. Dispatch the producer with the Agent tool. Prompt: the brief path, and nothing else the files do not hold.
    3. Register proposed claims in `claims.md` as `draft`. Commit the producer's output.
    4. Run the gates in order, per the review-gates skill, with the write guard around every reviewer dispatch.
-      G0 on `.tex` artifacts: `python3 ~/dotclaude/scripts/lint_tex.py`, as in review-gates. Add a Review log row after every round.
+      G0 on `.tex` artifacts: `python3 ~/dotclaude/scripts/lint_tex.py`, as in review-gates. Add a Review log row after every round, with `review_status.py .work/issues <slug> --hashes`.
    5. After every round: `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug>`.
       Act on its last line, `overall: <status> -> <action> [gate reviewer issue]`, and nothing else:
       `none` (converged): close the brief. `run`: next round of that gate and reviewer.

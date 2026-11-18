@@ -50,8 +50,10 @@ A clean round is a round with zero blocking and zero major issues (minor issues 
   who keeps the issue (same ID) or drops it. The orchestrator never resolves a rebuttal itself.
 - `needs_human`: the issue goes to "Open approvals" in `state.md`. The loop pauses for that issue.
 - Record each round in the brief's `## Review log` table (columns fixed by the brief template): round, gate, reviewer, model,
-  commit, verdict, counts by severity, and `git hash-object` of each artifact file. The hashes decide "same content" and "edit":
-  commits move with every report commit, so the rules below compare content by hash, not by commit.
+  commit, verdict, counts by severity, and the content hashes from `review_status.py .work/issues <slug> --hashes`.
+  Content is the artifact files plus their review context: `model.md`, `glossary.md`, and the `claims.md` entries of the
+  artifact's claims and their transitive dependencies (statement keys only; status and `verified_by` changes are not edits).
+  The rules below compare content by these hashes, not by commit: commits move with every report commit.
 
 ## Stopping rules
 
@@ -64,7 +66,7 @@ The script applies these rules to each gate reviewer, then gate, then the artifa
    - Critical artifact: two consecutive clean rounds of the gate. For G1 and G2, a clean G3 round counts as the second round:
      the gate converges when its first clean round and the clean G3 round are on the same content, with no edit in between.
      After the first clean round of G1 or G2 the script prints `open -> next-gate`: run the next gate.
-     G3 converges with one clean round. Any edit after a clean round voids it, and the gates rerun from G1.
+     G3 converges with one clean round. Any edit to the content after a clean round voids it, and the gates rerun from G1.
 2. Deadlock: the producer rejects the same canonical issue twice, and the reviewer keeps it twice. Arbitrate (below).
 3. Stalled: the producer's revision has no diff, or an artifact hash repeats an earlier round's hash. Escalate to the human.
 4. Round limit: 5 rounds per gate reviewer per artifact, or the brief's budget if smaller. Escalate to the human.

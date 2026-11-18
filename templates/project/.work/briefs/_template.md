@@ -8,6 +8,8 @@ File name: `briefs/<id>.md`, with `<id>` = `<stage>-<short-slug>`, e.g. `S4-safe
 - model: <model ID>
 - effort: <low | medium | high | xhigh | max>
 - artifact slug: <slug used in .work/issues/ file names>
+- artifact files: <comma-separated paths of the artifact's files>
+- claims: <C-IDs the artifact states or proves | none>
 - critical: <yes | no>  (main theorem, design, or final deliverable)
 - main theorem: <yes | no>
 - gates: <from the playbook stage, e.g. G0, G1, G2[assumption-auditor proof-checker], G3>
@@ -44,8 +46,9 @@ Overrun means stop and escalate to me.
 
 ## Review log
 
-One row per review round. `hashes`: `<path>=<git hash-object>` per artifact file, `;`-separated.
-`review_status.py` reads this table: keep the columns.
+One row per review round. `hashes`: the output of `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug> --hashes`,
+taken after the round's reports are committed. It covers the artifact files, `model.md`, `glossary.md`, and the `claims.md`
+entries of the claims above and their dependencies. `review_status.py` reads this table: keep the columns.
 
 | round | gate | reviewer | model | commit | verdict | blocking | major | minor | hashes |
 |---|---|---|---|---|---|---|---|---|---|
