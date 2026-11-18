@@ -178,6 +178,9 @@ def cases():
     yield dl("ruling-main-theorem", main=True).ruling(X, 1, "producer_right")
     yield (dl("duplicate-closed-by-ruling", critical=True).review("G2", "counterexample-hunter", 1, "A")
            .review("G3", "codex", 1, "A", [issue("G3", "codex", 1, "major", dup=X)]).ruling(X, 1, "producer_right"))
+    yield dl("ruling-both-need-human").ruling(X, 1, "needs_human").ruling(X, 2, "needs_human")
+    yield dl("ruling-main-theorem-second-needs-human", main=True).ruling(X, 1, "reviewer_right").ruling(X, 2, "needs_human")
+    yield dl("ruling-needs-human-then-producer-right").ruling(X, 1, "needs_human").ruling(X, 2, "producer_right")
     yield dl("ruling-main-theorem-second", main=True).ruling(X, 1, "producer_right").ruling(X, 2, "reviewer_right")
 
 

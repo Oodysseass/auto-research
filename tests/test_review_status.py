@@ -217,3 +217,41 @@ def test_cli_hashes_prints_review_log_cell():
     assert [k.split("=")[0] for k in cell.split("; ")] == ["paper/lemma.tex", ".work/model.md", ".work/glossary.md", "claims"]
     brief = (FIX / "converged" / ".work" / "briefs" / "S1-lemma.md").read_text()
     assert cell in brief
+
+
+# Deadlock ladder: arbiter, then arbiter-mythos, then the human.
+
+def test_both_arbiters_need_human_goes_to_human():
+    res = status("ruling-both-need-human")["overall"]
+    assert (res["status"], res["action"]) == ("deadlocked", "human")
+    assert res["question"] == "Which?"
+
+
+def test_main_theorem_second_ruling_needs_human_overrides_first():
+    assert overall("ruling-main-theorem-second-needs-human")[:2] == ("deadlocked", "human")
+
+
+def test_mythos_ruling_settles_after_first_needs_human():
+    # ruling 2 (producer_right) closes the issue; G2 moves on to counterexample-hunter.
+    assert overall("ruling-needs-human-then-producer-right") == ("open", "run", "G2", "counterexample-hunter")
+
+
+@pytest.mark.parametrize("case", sorted(p.name for p in FIX.iterdir() if p.is_dir()))
+def test_human_only_after_the_arbiters(case):
+    """Every deadlocked -> human verdict has ruling 1, and ruling 2 where the ladder requires it."""
+    res = status(case)
+    for s in list(res["gates"].values()) + [res["overall"]]:
+        if s["status"] != "deadlocked":
+            continue
+        issue = s["issue"]
+        g, rv, n = issue.split("/")
+        rulings = {int(p.name[-6]) for p in (FIX / case / ".work" / "issues").glob(f"lemma.{g}.{rv}.i{n}.ruling*.json")}
+        if s["action"] == "arbitrate":
+            assert rulings == set()
+        if s["action"] == "arbitrate-mythos":
+            assert rulings == {1}
+        if s["action"] == "human":
+            assert 1 in rulings
+            r1 = json.loads((FIX / case / ".work" / "issues" / f"lemma.{g}.{rv}.i{n}.ruling1.json").read_text())["ruling"]
+            if r1 == "needs_human" or res["main"]:
+                assert 2 in rulings

@@ -1,0 +1,13 @@
+{
+  "arbiter": "arbiter",
+  "model": "claude-opus-5-5",
+  "commit": "r1",
+  "artifact": "paper/lemma.tex",
+  "issue_id": "G2/proof-checker/1",
+  "ruling": "needs_human",
+  "reviewer_case": "R.",
+  "producer_case": "P.",
+  "reasoning": "Checked.",
+  "required_change": null,
+  "human_question": "Which?"
+}

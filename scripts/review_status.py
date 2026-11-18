@@ -24,6 +24,8 @@ Prints one line per gate, `open issues: ...`, and a last line
   overall: <status> -> <action> [<gate> <reviewer>]
 status: converged | deadlocked | stalled | max_rounds | open
 action: none | run | next-gate | arbitrate | arbitrate-mythos | human
+A deadlock gives `arbitrate`, then `arbitrate-mythos` (ruling 1 needs_human, or main theorem), and `human` only
+when the governing ruling is needs_human or the producer rejects again after reviewer_right.
 `open -> next-gate` means a critical artifact has one clean round of the gate and may move on:
 a clean G3 round on the same content completes it. Exit 0, or 2 on usage errors.
 """

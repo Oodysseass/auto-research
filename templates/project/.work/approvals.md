@@ -12,7 +12,7 @@ I loosen this file per project. Agents never edit the Policy table.
 | Property and theorem statements, before proving starts | yes |
 | Each milestone or final deliverable | yes |
 | Any change to the contract or model after approval | yes |
-| Deadlock in a review loop | yes |
+| Deadlock unresolved by the arbiters | yes |
 | Deleting or overwriting existing files | yes |
 | Mythos escalation | no (log in `decisions.md`) |
 

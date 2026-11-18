@@ -68,6 +68,7 @@ The script applies these rules to each gate reviewer, then gate, then the artifa
      After the first clean round of G1 or G2 the script prints `open -> next-gate`: run the next gate.
      G3 converges with one clean round. Any edit to the content after a clean round voids it, and the gates rerun from G1.
 2. Deadlock: the producer rejects the same canonical issue twice, and the reviewer keeps it twice. Arbitrate (below).
+   A deadlock reaches the human only after the arbiters, never before `arbiter` has ruled.
 3. Stalled: the producer's revision has no diff, or an artifact hash repeats an earlier round's hash. Escalate to the human.
 4. Round limit: 5 rounds per gate reviewer per artifact, or the brief's budget if smaller. Escalate to the human.
 
@@ -75,11 +76,15 @@ Escalating means: set the brief status to `escalated`, add the event to "Open ap
 
 ## Deadlock arbitration
 
+Order: `arbiter`, then `arbiter-mythos` (if ruling 1 is `needs_human`, or the issue concerns a main theorem), then the human.
+`review_status.py` prints `arbitrate`, then `arbitrate-mythos`, then `human`, in that order. The `approvals.md` event is
+"Deadlock unresolved by the arbiters": it applies only at step 3 below, or to a rejection after a `reviewer_right` ruling.
+
 1. Dispatch `arbiter` on the canonical issue. Prompt: the issue ID, the review and response files that contain it, the brief, the artifact,
    and the ruling file name `.work/issues/<slug>.<gate>.<reviewer>.i<n>.ruling1.json`.
 2. Dispatch `arbiter-mythos` (ruling file `...ruling2.json`, plus the path of ruling 1) if ruling 1 is `needs_human`,
    or the issue concerns a main theorem. For a main theorem, ruling 2 governs, even when it differs from ruling 1.
-3. Escalate to the human if the governing ruling is `needs_human`. Put its `human_question` in "Open approvals".
+3. Escalate to the human only if the governing ruling is `needs_human`. Put its `human_question` in "Open approvals".
 4. Validate each ruling against `~/dotclaude/schemas/arbiter-ruling.schema.json`. Log each ruling in `decisions.md`.
 
 Effect of the governing ruling:

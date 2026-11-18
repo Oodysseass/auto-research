@@ -1,0 +1,11 @@
+{
+  "producer": "prover",
+  "commit": "x1",
+  "responses": [
+    {
+      "issue_id": "G2/proof-checker/1",
+      "status": "rejected",
+      "justification": "Because."
+    }
+  ]
+}
