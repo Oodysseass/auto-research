@@ -1,0 +1,11 @@
+{
+  "producer": "modeler",
+  "commit": "e2ab108",
+  "responses": [
+    {
+      "issue_id": "G2/assumption-auditor/3",
+      "status": "fixed",
+      "justification": "paper/lemmas.tex: each of the five notation entries is now a `definition` environment with a `def.` label, wording unchanged: def.honest-corrupted (Parties and corruption), def.chain-length (Chains), def.successful-round (Mining), def.chain-at and def.min-max-len (Notation). model.md \"Notation\" lists each label with its entry and states that the entries define notation only and add no assumption. glossary.md \"Notation conventions\" lists the labels. Assumption numbering is unchanged (llncs gives definitions their own counter; checked in output/main.aux). Build exits 0; G0 lint accept, 0 issues. The five definitions are proposed as claims in the brief's Result section for the orchestrator to register."
+    }
+  ]
+}

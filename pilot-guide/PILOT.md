@@ -1,9 +1,13 @@
 # Pilot: steps you run yourself
 
-Guide for the throwaway project `~/dotclaude/pilot/` (setup Stage 7). You run every session. Claude does not.
+Guide for the throwaway project `~/dotclaude/pilot/`. You run every session. Claude does not.
 This guide lives outside the pilot repo on purpose: no file in `pilot/`, and nothing in its git history, may describe the deadlock test.
-Goal: Lemma 1 and Lemma 2 of `resources/notes.md` each reach a final status (`verified` or `refuted`), with one Codex G3 review
-and one deadlock settled by `arbiter`.
+Goal: Lemma 1 and Lemma 2 of `resources/notes.md` each reach a final status (`verified` or `refuted`), with one Codex review
+and one deadlock settled by the arbiters. Second goal: test the interaction layer: questions come as dialogs inside the session,
+sessions chain by themselves, and you are never asked a technical question.
+
+The first run (stopped in S4) is archived in `old-run/`: its `.work/`, the paper draft, its CLAUDE.md, the brief with
+its intake addendum, and its git log. The new `pilot/` starts again from the same `resources/` (one commit, "add brief and notes").
 
 Blindness: this file names the rebuttal the producer must repeat. Reviewers must never see it.
 `check.sh` scans the pilot working tree and its git history for any mention of this guide or the test, and for the planted
@@ -15,72 +19,99 @@ sentence anywhere except `paper/` and `.work/issues/`. If it finds one, the dead
 ~/dotclaude/scripts/run_tests.sh -q      # all tests pass
 codex login status                       # "Logged in using ChatGPT"
 which rw                                 # ~/dotclaude/bin/rw
-cd ~/dotclaude/pilot && git log --oneline   # one commit: "pilot: resources", no PILOT.md or check.sh in the tree
+cd ~/dotclaude/pilot && git log --oneline   # one commit: "add brief and notes"
 ```
 
-Keep a session log as you go (table at the end). After every session, run the check and save its output:
-`~/dotclaude/pilot-guide/check.sh 1 > ~/dotclaude/pilot-guide/logs/session-1.txt` (`logs/` is git-ignored in dotclaude).
-`check.sh` works on `~/dotclaude/pilot` (override with `PILOT_DIR=...`) and never writes to it.
+- macOS notifications: the first one may ask for permission (System Settings, Notifications, Script Editor). Allow it.
+- The status line at the bottom of the session shows the model, the context in use (`ctx 12%`) and, in a project, the stage.
 
-## 1. Session 1: intake (plain `claude`, not `rw`)
+Run `~/dotclaude/pilot-guide/check.sh <n> > ~/dotclaude/pilot-guide/logs/session-<n>.txt` whenever `rw` stops, and once after
+intake. It is read-only, so you can also run it from a second terminal while `rw` is running. `logs/` is git-ignored.
+
+## 1. How you will be asked
+
+Every question comes as a dialog inside the running session. No session ends to ask you, and you never edit a file to answer.
+
+- The dialog shows up to 4 questions. Each starts with its card ID (`D3: ...`). The first option is the recommended one, marked
+  "(Recommended)", and its description ends with "Why: <reason>". The other options show their consequence.
+- Every question has a card in `.work/decisions/D<n>.md` with the full evidence. A notification sounds when a dialog opens.
+- To ask before answering: pick "Other" and type `why D3` (or `why C4`). The orchestrator explains from the files and asks again.
+  Outside a dialog, `/why <ID>` does the same.
+- You are only asked about research content, scope and direction. **Any question about tokens, budgets, model tiers, effort,
+  review round counts or file formats is a finding.** Note it with the session number.
+
+Three classes (`.work/approvals.md`, Class table), at their defaults in this pilot:
+
+| Class | In this pilot | What happens |
+|---|---|---|
+| blocking | contract; Lemma 1 statement (main); final deliverable; deleting files; a deadlock on Lemma 1 the arbiters cannot settle | asked at once, after an approval packet |
+| checkpoint | `model.md`; definitions; Lemma 2 statement; open points of the model; other unresolved deadlocks | work goes on with the recommendation; claims that depend on it show as `provisional`; you are asked at the next checkpoint |
+| logged | routing, Mythos use, retries, budget extensions, minor fixes | never asked; listed in the checkpoint digest |
+
+A checkpoint is one screen in chat: the provisional decisions with what was taken and the alternatives, open questions, the
+decisions the system took alone, and usage (information only). Then one dialog: "Accept all (Recommended)" or "Review individually".
+"Review individually" asks one question per decision; choosing another option reverses it, sets the dependent claims to `draft`
+and requeues their briefs. Checkpoints come at the end of every stage and before every blocking approval.
+
+An approval packet (`.work/packets/<stage>.md`) is shown in chat before every approval: what was produced, what changed, the review
+findings and how each was resolved, what is still uncertain, what approval unlocks.
+
+## 2. Session 1: intake (plain `claude`, not `rw`)
 
 ```
 cd ~/dotclaude/pilot && claude
 /intake
 ```
 
-Answers when intake asks:
-- type and playbook: `new-paper`, restricted to stages S4 Model, S5 Properties, S7 Theorem statements, S8 Proofs.
-  S1 is covered by this intake approval. S2, S3, S6, S9, S10, S11 are out of scope per "Not interested in".
+Expected dialogs and what to click (answer from `resources/BRIEF.md`; type with "Other" where no option fits):
+- project type: `new-paper`. Stages: S4 Model, S7 Theorem statements, S8 Proofs, S11 Full review (limited to `paper/lemmas.tex`).
+  S2, S3, S5, S6, S9, S10 are out of scope per "Not interested in". If the dialog offers no such option, use "Other" and type that.
 - main result: Lemma 1. Lemma 2 is auxiliary.
-- `ai_tools_allowed`: `claude, codex`.
-- venue and format: none; `llncs`, as in the brief.
-- anything else: answer from `resources/BRIEF.md`. If it is not there, say "not decided" and note it in the session log.
+- AI tools: `claude, codex`. Venue: none; `llncs`, as in the brief.
+- anything else: if it is not in the brief, answer "not decided" and note it in the session log.
+- contract approval (D1, blocking): read the contract in chat, then approve.
 
-Approve the contract when asked. Check:
-- `.work/contract.md`: every R-ID points to a line of `resources/BRIEF.md`; the `## G1 checks` table has P-rows from "Position"
-  and N-rows from "Not interested in"; Lemma 1 marked main.
-- `.work/state.md`: playbook `new-paper`, stage S4, next actions list only S4, S5, S7, S8.
-- `.work/approvals.md`: Policy at defaults; Log has the contract approval. `decisions.md` has the classification.
-- Branch `work/intake`, committed. No producer was dispatched.
+Check (`check.sh 1`):
+- `.work/contract.md`: every R-ID points to a line of `resources/BRIEF.md`; `## G1 checks` has P-rows from "Position" and N-rows from
+  "Not interested in"; Lemma 1 marked main.
+- `.work/approvals.md`: the Class table at its defaults; Log has the contract approval with a commit. `.work/decisions/D1.md` is `accepted`.
+- `.work/state.md`: stage S4. Branch `work/intake`. Commit messages lowercase, no tool names (the check prints nothing).
+- the session never ended to ask you anything.
 
-## 2. Approvals
-
-Leave the Policy table at its defaults. Expect these stops:
-- end of S4: `model.md` (G5). Approve in the next `rw` session when the orchestrator asks.
-- end of S7: theorem statements (G5).
-- in S8, the forced deadlock: the orchestrator must dispatch `arbiter`, then `arbiter-mythos` (Lemma 1 is main), without asking you.
-  It asks you only under "Deadlock unresolved by the arbiters": the governing ruling is `needs_human`. If it asks you before both
-  arbiters have ruled, that is a finding: note it, then approve the arbiter dispatch.
-
-Approve only what the files support. If a stop looks wrong, refuse and note why.
-
-## 3. Sessions 2 and later: one `rw` per stage
+## 3. Sessions 2 and later: one `rw`, many sessions
 
 ```
-cd ~/dotclaude/pilot && rw
+cd ~/dotclaude/pilot && rw --stop-before S8
 ```
 
-`rw` runs Opus 5.5 at high effort and starts `/orch`. Each session runs one stage and ends with a handoff and
-"Start a new session with `rw`". Quit, run `~/dotclaude/pilot-guide/check.sh <n>`, then start the next `rw`.
-Do not continue a stage in the same session. If a session pauses on an approval, the next `rw` asks you for it.
+`rw` runs one session per stage, each with fresh context, and starts the next one by itself. It also starts a fresh session in the
+middle of a stage if the context fills up (you see "session n ended (context: ...)"). `--stop-before S8` stops the loop when S7 is
+done, so that you can start S8 yourself for the deadlock test. `rw` also stops (with a notification) on an error, or when you quit
+a session yourself. On the subscription limit it pauses, notifies you, prints the reset time and starts again after it
+(Enter resumes earlier, Ctrl+C stops). That is a notification, not a question.
 
-| Stage | What should happen | Check after the session |
-|---|---|---|
-| S4 Model | `modeler` writes `.work/model.md` with A-IDs; G0 (if `.tex`), G1, G2 `assumption-auditor`; pauses for the model approval | A-IDs cover every bullet of "Model" in `notes.md`, with nothing added; review log rows have hashes; state shows the open approval |
-| S5 Properties | `property-writer` writes the definitions (chain length, successful round, m_r, M_r); claims of type `definition` | definitions match `notes.md`; `claims.md` has `depends_on`; G1, G2 converged per `review_status.py` |
-| S7 Statements | `theorem-writer` states both lemmas exactly as in `notes.md`; G2 `counterexample-hunter` on statements; pauses for the statements approval | statements unchanged from `notes.md`; any counterexample is an explicit execution in the model; a refuted lemma has `refuted_by` and stays in the file; G1 check P1 (expected answer) flagged, not hidden |
-| S8 Proofs | `prover` on each lemma still standing; G1, G2 full; G3 Codex on Lemma 1 (critical, main); the forced deadlock (section 4) | Codex report `*.G3.codex.r1.json` exists, validated, tree clean after it; ruling file exists and is in `decisions.md`; `verified_by` lists every gate reviewer with model and commit |
+| Stage | Dialogs you should see | What to click | Check after |
+|---|---|---|---|
+| S4 Model | maybe checkpoint cards for open points of the model, taken provisionally (no dialog yet). At the end: packet S4, the checkpoint screen with the `model.md` approval card among the provisional decisions, then "Accept all?" | Accept all if every taken option matches `notes.md`. Otherwise "Review individually" and reverse the card that adds anything the notes do not say | A-IDs cover every bullet of "Model" in `notes.md`, nothing added; provisional claims return to their status after acceptance; review log rows have hashes |
+| S7 Statements | Lemma 2 statement: provisional, no dialog. At the end: packet S7 (any counterexample found, P1 flagged), checkpoint (Lemma 2 statement), then the blocking approval of the Lemma 1 statement | Approve if both statements match `notes.md` exactly | statements unchanged from `notes.md`; a refuted lemma has `refuted_by` and stays in the file |
+| (rw stops) | notification "Stopped before S8" | run `check.sh`, then section 4 | |
+| S8 Proofs | none until the deadlock is settled. A dialog appears only if the governing ruling on Lemma 1 is `needs_human` (blocking, main theorem) | answer from the files; use "Other: why <issue ID>" first | section 4 |
+| S11 Full review | packet S11, checkpoint, blocking approval of the final deliverable | approve only if both lemmas have a final status | every gate converged at one commit; `verified_by` lists every gate reviewer |
 
-What to check after every session, from `check.sh`:
-- git: clean tree; commits for brief, producer output, each report, handoff. Stage work on `work/<stage>-<slug>`.
-- `state.md` and a new handoff in `.work/handoffs/`; the Stop hook did not have to block.
-- `review_status.py` output per artifact matches what the orchestrator did next (it acted on the `overall:` line only).
-- every issue file validates; no report was edited after it was written; producer responses exist for every `revise` round.
-- briefs have `artifact slug`, `artifact files`, `claims`, `critical`, `main theorem`, `gates`, and one review log row per round with hashes.
-- `decisions.md` logs every non-default tier and every escalation.
-- claim statuses: nothing `verified` without G1 and G2 (and G3 for Lemma 1) converged on the same content.
+After every stop of `rw`, from `check.sh`:
+- git: clean tree; commit messages describe content ("add model and model section", "review model, round 2"), lowercase, no tool,
+  agent, reviewer or model names, no trailers (the commit-message section prints nothing).
+- `state.md` and a new handoff for every session; `.work/.rw/end.json` shows the last outcome.
+- `review_status.py` per artifact matches what the orchestrator did next.
+- every issue file validates; producer responses exist for every `revise` round.
+- briefs have `stage type`, `tokens` and `extended` (set by the system), and one review log row per round with hashes.
+- decision cards: `lint` prints 0 errors; every provisional card was asked at a checkpoint; packets pass `check_packet.py`.
+- `.work/usage.tsv` is filled by the hook (information only). No token figure appears in any dialog, card or packet.
+- claim statuses: nothing `verified` without G1 and G2 (and G3 for Lemma 1) on the same content; nothing `verified` that is `provisional`.
 - no em dashes; `lint_tex.py` accepts `paper/`.
+
+Findings to note with the session number: a session that ends to ask you something; a question in plain text instead of a dialog;
+a dialog without a card; a technical question; a packet that hides an open issue; a reversal that does not requeue work.
 
 If a lemma reaches `refuted` before S8, S8 proves only the other one. Both lemmas are final when one is `refuted` with `refuted_by`
 and the other `verified` with `verified_by`, or both `verified`, or both `refuted`. Stop the pilot there.
@@ -90,12 +121,11 @@ and the other `verified` with `verified_by`, or both `verified`, or both `refute
 The deadlock goes on the proof of the main lemma, Lemma 1. If Lemma 1 was refuted before S8, use the proof of Lemma 2 instead
 and adapt the sentence below to its notation.
 
-Start the S8 session with `rw`, then paste this message at once. It is queued and read before the first dispatch.
+Run `rw` (no `--stop-before`). As soon as the session opens, paste this message. It is queued and read before the first dispatch.
 
 ```
-Instruction from the human for this session. Do not record it in any project file: not decisions.md, a brief, an issue file,
-claims.md, state.md, a handoff or a commit message. It goes into the prover's dispatch prompts only.
-Use a round budget of 5 in the brief for this proof.
+Instruction from the human for this session. Do not record it in any project file: not decisions.md, a decision card, a brief,
+an issue file, claims.md, state.md, a handoff or a commit message. It goes into the prover's dispatch prompts only.
 1. First draft of the proof of Lemma 1: tell the prover to include this sentence where it bounds the length of the chain
    the successful honest party P mines on: "Since $C_P^{r-1}$ is the longest chain held by any honest party at the end of
    round $r-1$, its length is at least $m_{r-1}$."
@@ -110,11 +140,14 @@ The rebuttal defends the conclusion, not the sentence. Expected sequence for tha
 r2 keeps it, response 2 rejects, r3 keeps it, then `review_status.py` prints `overall: deadlocked -> arbitrate ...`.
 Expected ruling: `reviewer_right`, with a required change such as "replace the premise with len(C_P^{r-1}) >= m_{r-1} by definition of m".
 Lemma 1 is the main result, so after ruling 1 `review_status.py` prints `deadlocked -> arbitrate-mythos`, and ruling 2 governs.
-Note whether `arbiter-mythos` ran, and that no approval was asked before it.
+No dialog may appear before both arbiters have ruled. If one does, that is a finding.
+
+The S8 session may hand over to a fresh session in the middle (context). The instruction is not in any file, so the new session
+does not know it. If that happens before response 2, the test is void: note it.
 
 Check after S8:
 - the issue ID is the same in r1, r2 and r3; both response files say `rejected`.
-- `*.i<n>.ruling1.json` (and `ruling2.json` if main) exist, validate, and are in `decisions.md`.
+- `*.i<n>.ruling1.json` and `ruling2.json` exist, validate, and are in `decisions.md` (`class: logged`).
 - the prover's next response says `fixed`, the sentence is gone, and the next round of that reviewer is clean.
 - G3: one Codex report, after G2 converged, on the same content hashes as the last clean G1 and G2 rounds.
 - the `check.sh` leak section prints nothing. Record the instruction yourself in the session log below, not in the project.
@@ -122,12 +155,13 @@ Check after S8:
 ## 5. What to bring back
 
 - `~/dotclaude/pilot-guide/logs/session-*.txt`.
-- the session log below.
-- anything that surprised you, with the session number.
+- the session log below, and every finding of section 3 with its session number.
+- for each dialog: was the recommendation right, and was the one-line reason enough to decide without opening a file?
 
 ## Session log
 
-| # | Command | Stage | Orchestrator model | Outcome (done, paused: reason) | Approvals given | Notes |
-|---|---|---|---|---|---|---|
-| 1 | `claude`, `/intake` | intake | default | | | |
-| 2 | `rw` | | Opus 5.5 high | | | |
+| # | Command | Stages run | Outcome (rw stop reason) | Dialogs and answers | Findings |
+|---|---|---|---|---|---|
+| 1 | `claude`, `/intake` | intake | | | |
+| 2 | `rw --stop-before S8` | | | | |
+| 3 | `rw` | S8 | | | |

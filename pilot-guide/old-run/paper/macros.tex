@@ -1,0 +1,13 @@
+% Project macros. Every macro here is listed in .work/glossary.md, section "Macros".
+
+% Theorem-like environments not provided by llncs.
+\spnewtheorem{assumption}{Assumption}{\bfseries}{\itshape}
+\crefname{assumption}{Assumption}{Assumptions}
+\Crefname{assumption}{Assumption}{Assumptions}
+
+% Model objects (resources/notes.md, section "Model").
+\newcommand{\genesis}{G}                              % genesis chain G
+\newcommand{\len}[1]{\operatorname{len}(#1)}          % len(C): number of blocks of C after G
+\newcommand{\chainat}[2]{C_{#1}^{#2}}                 % C_P^r: chain of honest party P at the end of round r
+\newcommand{\minlen}[1]{m_{#1}}                       % m_r: minimum of len(C_P^r) over all honest P
+\newcommand{\maxlen}[1]{M_{#1}}                       % M_r: maximum of len(C_P^r) over all honest P

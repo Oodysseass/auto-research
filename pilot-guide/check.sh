@@ -31,9 +31,23 @@ done | sort | uniq -c
 echo; echo "--- briefs: status, tiers, review log rows"
 for b in .work/briefs/*.md; do
   case "$b" in *_template.md) continue;; esac
-  echo "$b"; grep -E '^- (status|assigned agent|model|effort|artifact slug|critical|main theorem|gates|claims):' "$b"
+  echo "$b"; grep -E '^- (status|stage type|assigned agent|model|effort|artifact slug|critical|main theorem|gates|claims|tokens|extended):' "$b"
   grep -c '^| [0-9]' "$b" | sed 's/^/  review log rows: /'
 done
+echo; echo "--- decision cards (lint must print 0 errors)"
+python3 ~/dotclaude/scripts/decisions.py list
+python3 ~/dotclaude/scripts/decisions.py lint | tail -5
+echo; echo "--- approval packets"
+for f in .work/packets/*.md; do
+  [ -e "$f" ] || continue; case "$f" in */README.md) continue;; esac
+  python3 ~/dotclaude/scripts/check_packet.py "$f" | tail -3
+done
+echo; echo "--- usage logged by the hook (information only)"
+[ -f .work/usage.tsv ] && awk -F'\t' 'NR>1{t[$4]+=$6; s+=$6} END{for(b in t) printf "  %s %dk\n", b, t[b]/1000; printf "  total %dk\n", s/1000}' .work/usage.tsv
+echo; echo "--- rw session-end marker"; cat .work/.rw/end.json 2>/dev/null || echo "  none"
+echo; echo "--- commit messages (commit-style): must print nothing"
+git log --all --format='%h %s%n%b' | grep -niE 'co-authored|claude|anthropic|\bAI\b|agent|generated|opus|sonnet|mythos|codex|reviewer|checker|auditor|hunter' | sed 's/^/  /'
+git log --all --format='%h %s' | grep -E '^[0-9a-f]+ ([A-Z]|[A-Za-z0-9/-]+: )' | sed 's/^/  capitalized or prefixed: /'
 echo; echo "--- decisions.md (last 25 lines)"; tail -25 .work/decisions.md
 echo; echo "--- approvals log"; sed -n '/^## Log/,$p' .work/approvals.md
 echo; echo "--- leaks (blindness): must print nothing"

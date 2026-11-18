@@ -1,0 +1,28 @@
+{
+  "gate": "G1",
+  "reviewer": "conformance-reviewer",
+  "model": "claude-opus-5-5",
+  "artifact": ".work/model.md, paper/lemmas.tex#sec.model, paper/main.tex, paper/macros.tex",
+  "commit": "dc84a64",
+  "issues": [
+    {
+      "id": "G1/conformance-reviewer/1",
+      "severity": "minor",
+      "location": ".work/model.md, section \"Oracle or setup\"",
+      "claim": null,
+      "evidence": "\"No random oracle, PKI or other setup. Mining is not modelled by an oracle or by probabilities\". resources/notes.md lines 3-36 say nothing about setup, PKI or how mining is modelled beyond notes:25. The sentence resolves a point on which the notes are silent, has no notes:N source and no Source map row, and is not listed under \"Open points\". Acceptance criterion 2 of the brief asks that silent points be listed, not resolved. It does not change any A-ID, so it is not model drift, but a later proof could cite it as if it were part of the model.",
+      "suggested_fix": "Replace the two sentences with: \"The notes state no setup beyond the genesis chain (A4). Whether a mining attempt succeeds is part of the execution (A9).\"",
+      "duplicate_of": null
+    },
+    {
+      "id": "G1/conformance-reviewer/2",
+      "severity": "minor",
+      "location": ".work/glossary.md, Terms table, row \"mining attempt\"; .work/model.md, Open points, OP4",
+      "claim": null,
+      "evidence": "The binding glossary says \"success extends the current chain (honest) or a chain the adversary chooses (corrupted) by one block\". model.md OP4 says this reading \"is not in the notes, and no A-ID states it\". Two binding files now disagree on what a corrupted success produces, and the glossary version is the stronger one. The producer flagged it and could not edit the Terms table, but until it is resolved a proof or counterexample in S7 can use the glossary row as an unlisted assumption about adversarial chains, which matters for both lemmas.",
+      "suggested_fix": "Record OP4 in approvals.md for the human. Until the human decides, add a note to the glossary row \"mining attempt\" that the corrupted case is open (model.md OP4) and is not an assumption.",
+      "duplicate_of": null
+    }
+  ],
+  "verdict": "accept"
+}

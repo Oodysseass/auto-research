@@ -1,0 +1,9 @@
+{
+  "gate": "G0",
+  "reviewer": "lint-tex",
+  "model": "none",
+  "artifact": "paper/lemmas.tex",
+  "commit": "8f73e06",
+  "issues": [],
+  "verdict": "accept"
+}

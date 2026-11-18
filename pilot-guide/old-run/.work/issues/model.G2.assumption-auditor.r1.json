@@ -1,0 +1,37 @@
+{
+  "gate": "G2",
+  "reviewer": "assumption-auditor",
+  "model": "claude-opus-5-5",
+  "artifact": ".work/model.md, paper/lemmas.tex#sec.model, paper/main.tex, paper/macros.tex",
+  "commit": "37cf748",
+  "issues": [
+    {
+      "id": "G2/assumption-auditor/1",
+      "severity": "major",
+      "location": ".work/glossary.md, Terms table, row \"mining attempt\"; .work/model.md, Open points, OP4",
+      "claim": null,
+      "evidence": "The glossary is binding (CLAUDE.md: \"glossary.md ... wins over global glossaries\"; model.md \"Terms and macros: glossary.md\") and its Terms rows act as definitions. A proof step that rests on a definition counts as sourced. The row \"mining attempt\" says \"success extends ... a chain the adversary chooses (corrupted) by one block\". model.md OP4 says this reading \"is not in the notes, and no A-ID states it\". So the binding files give an S7 proof or counterexample a citable source for what a successful corrupted attempt produces, while model.md lists no A-ID for it. That is an unlisted assumption reachable through a definition, and it is exactly the point that decides which adversarial chains exist, so it affects both Lemma 1 and Lemma 2. The model.md \"Parties\" section also routes the definition of honest and corrupted party through the glossary, so the glossary is part of the model's dependency base, not background. This is the dependency-tracing side of G1/conformance-reviewer/2; it is rated major here because the audit at S7 cannot detect the drift once the glossary row is cited as a definition.",
+      "suggested_fix": "Change the glossary row \"mining attempt\" to: \"one attempt per party per round; an honest success extends the current chain by one block; what a corrupted success produces is open (model.md OP4) and is not an assumption\" (human or orchestrator edit, since the Terms table is outside the modeler's bounds).",
+      "duplicate_of": "G1/conformance-reviewer/2"
+    },
+    {
+      "id": "G2/assumption-auditor/2",
+      "severity": "minor",
+      "location": ".work/model.md, section \"Oracle or setup\"",
+      "claim": null,
+      "evidence": "\"No random oracle, PKI or other setup. Mining is not modelled by an oracle or by probabilities\". These are model statements in a binding file with no A-ID and no notes:N source; only the clause after the colon is backed by A9. model.md says \"Proofs and arguments may use only the assumptions listed here\", yet a later step could cite these sentences (for example, the absence of any setup) as part of the model without any A-ID. Same text as G1/conformance-reviewer/1, raised here because it is an unsourced model fact.",
+      "suggested_fix": "Replace the two sentences with: \"The notes state no setup beyond the genesis chain (A4). Whether a mining attempt succeeds is part of the execution (A9).\"",
+      "duplicate_of": "G1/conformance-reviewer/1"
+    },
+    {
+      "id": "G2/assumption-auditor/3",
+      "severity": "minor",
+      "location": "paper/lemmas.tex:10-11, 30-32, 69, 90-92; .work/model.md, section \"Notation\"",
+      "claim": null,
+      "evidence": "The definitions that both lemma statements rest on (successful round at line 69, \\chainat{P}{r}, \\minlen{r}, \\maxlen{r} at lines 90-92, chain and length at lines 30-32, honest and corrupted party at lines 10-11) are plain text with no label and no C-ID. Lemma 1 uses \"successful\", m_{r+1} and m_{r-1}; Lemma 2 uses M_r and m_r. When their claims.md entries are written, depends_on cannot name these definitions, and a proof step that uses, for example, \"m_r is a minimum over all honest P\" can be traced only to unlabelled text. The agent protocol makes every new definition a claim; none is registered.",
+      "suggested_fix": "Put each of the five notation entries in a `definition` environment with a `def.` label (for example `def.successful-round`, `def.chain-at`, `def.min-max-len`), list the label in the model.md Notation row, and have the orchestrator register each as a `definition` claim with assumptions none and depends_on none.",
+      "duplicate_of": null
+    }
+  ],
+  "verdict": "revise"
+}

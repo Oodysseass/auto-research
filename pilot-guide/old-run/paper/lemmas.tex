@@ -1,0 +1,105 @@
+\section{Model}\label{sec.model}
+
+\paragraph{Parties and corruption}
+
+\begin{assumption}[Static corruption]\label{asm.static-corruption}
+There are $n$ parties.
+The adversary corrupts a fixed set of at most $t$ parties before the execution starts.
+\end{assumption}
+
+\begin{definition}[Honest and corrupted parties]\label{def.honest-corrupted}
+The corrupted parties are the parties in the set of \Cref{asm.static-corruption}.
+The other parties are honest.
+\end{definition}
+
+\begin{assumption}[Corruption bounds]\label{asm.corruption-bounds}
+At least two parties are honest: $n - t \geq 2$.
+The adversary may corrupt at least one party: $t \geq 1$.
+\end{assumption}
+
+\paragraph{Rounds}
+
+\begin{assumption}[Rounds]\label{asm.rounds}
+The execution proceeds in rounds $r = 1, 2, 3, \dots$.
+Every party knows the current round.
+\end{assumption}
+
+\begin{assumption}[Genesis]\label{asm.genesis}
+Before round $1$, that is, in round $0$, every party holds the genesis chain $\genesis$.
+\end{assumption}
+
+\paragraph{Chains}
+
+\begin{definition}[Chain and length]\label{def.chain-length}
+A chain is a sequence of blocks that starts with $\genesis$.
+The length $\len{C}$ of a chain $C$ is the number of blocks of $C$ after $\genesis$.
+So $\len{\genesis} = 0$.
+\end{definition}
+
+\begin{assumption}[Valid chains]\label{asm.valid-chains}
+Only valid chains exist.
+The adversary cannot forge blocks.
+Every chain an honest party receives is valid.
+\end{assumption}
+
+\paragraph{Honest round procedure}
+
+\begin{assumption}[Honest round procedure]\label{asm.honest-round}
+In round $r$, an honest party $P$ executes the following steps, in this order.
+\begin{enumerate}
+    \item Receive every chain delivered to $P$ in round $r$.
+    \item Adopt the longest chain among its current chain and the received chains.
+          On a tie, keep the current chain.
+    \item Make one mining attempt.
+          On success, extend the current chain by one block.
+    \item If the current chain changed during round $r$, broadcast it.
+\end{enumerate}
+\end{assumption}
+
+\paragraph{Mining}
+
+\begin{assumption}[Honest mining attempts]\label{asm.honest-mining}
+Each honest party makes one mining attempt per round.
+\end{assumption}
+
+\begin{assumption}[Corrupted mining attempts]\label{asm.corrupted-mining}
+Each corrupted party makes one mining attempt per round, on any chain the adversary chooses.
+\end{assumption}
+
+\begin{assumption}[Success patterns]\label{asm.success-patterns}
+Whether a mining attempt succeeds is part of the execution.
+Every pattern of successes is a possible execution.
+\end{assumption}
+
+\begin{definition}[Successful round]\label{def.successful-round}
+Round $r$ is successful if at least one honest mining attempt succeeds in round $r$.
+\end{definition}
+
+\paragraph{Network}
+
+\begin{assumption}[Honest delivery]\label{asm.honest-delivery}
+A chain that an honest party broadcasts in round $r$ is delivered to every honest party in round $r + 1$.
+\end{assumption}
+
+\begin{assumption}[No dropping or delaying]\label{asm.no-drop}
+The adversary cannot drop or delay the deliveries of \Cref{asm.honest-delivery}.
+\end{assumption}
+
+\begin{assumption}[Adversarial delivery]\label{asm.adversarial-delivery}
+In any round, the adversary may deliver any chain it knows to any subset of the honest parties, and to none of the others.
+\end{assumption}
+
+\begin{assumption}[Rushing]\label{asm.rushing}
+The adversary is rushing: in round $r$, it sees the honest broadcasts of round $r$ before it chooses its own deliveries for round $r + 1$.
+\end{assumption}
+
+\paragraph{Notation}
+
+\begin{definition}[Chain of an honest party]\label{def.chain-at}
+The chain of honest party $P$ at the end of round $r$ is $\chainat{P}{r}$, and $\chainat{P}{0} = \genesis$.
+\end{definition}
+
+\begin{definition}[Minimum and maximum length]\label{def.min-max-len}
+The minimum of $\len{\chainat{P}{r}}$ over all honest $P$ is $\minlen{r}$, and the maximum is $\maxlen{r}$.
+So $\minlen{0} = \maxlen{0} = 0$.
+\end{definition}

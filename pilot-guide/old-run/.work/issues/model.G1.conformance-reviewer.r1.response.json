@@ -1,0 +1,16 @@
+{
+  "producer": "modeler",
+  "commit": "e2ab108",
+  "responses": [
+    {
+      "issue_id": "G1/conformance-reviewer/1",
+      "status": "fixed",
+      "justification": "model.md, section \"Oracle or setup\": the two sentences are replaced by the suggested text, \"The notes state no setup beyond the genesis chain (A4). Whether a mining attempt succeeds is part of the execution (A9).\" No statement about oracles, PKI or probabilities remains. The LaTeX section never contained these sentences. No A-ID changed."
+    },
+    {
+      "issue_id": "G1/conformance-reviewer/2",
+      "status": "needs_human",
+      "justification": "The fix lies outside my bounds: the brief keeps the glossary Terms table unchanged in meaning and puts approvals.md out of bounds, and resolving what a successful corrupted attempt produces is a model decision. Question for the human: decide OP4 (does a successful corrupted mining attempt extend the chosen chain by one block, or something else?), then either add it as an A-ID or change the glossary row \"mining attempt\" to the reviewer's wording. Mitigation done within my bounds: model.md OP4 now says the corrupted case of that glossary row is not an assumption and may not be cited until OP4 is decided; glossary.md \"Notation conventions\" has a new line \"Open term\" saying the same. The Terms row itself is unchanged."
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+
+64b25b4 2026-11-18 handoff: 20261118-1248 S4
+
+ .work/handoffs/20261118-1248.md | 31 +++++++++++++++++++++++++++++++
+ .work/state.md                  |  4 ++--
+ 2 files changed, 33 insertions(+), 2 deletions(-)
+
+bab2d76 2026-11-18 S4: register C1-C5 (draft); pause on needs_human (OP4)
+
+ .work/briefs/S4-model.md |  2 +-
+ .work/claims.md          | 58 ++++++++++++++++++++++++++++++++++++++++++------
+ .work/state.md           |  7 +++---
+ 3 files changed, 56 insertions(+), 11 deletions(-)
+
+9ba8c78 2026-11-18 S4: modeler revision r2 and responses (model)
+
+ .work/briefs/S4-model.md                           | 26 ++++++++++++++++++++++
+ .work/glossary.md                                  |  2 ++
+ .../model.G1.conformance-reviewer.r1.response.json | 16 +++++++++++++
+ .../model.G2.assumption-auditor.r1.response.json   | 11 +++++++++
+ .work/model.md                                     | 21 +++++++++--------
+ paper/lemmas.tex                                   | 13 +++++++++++
+ 6 files changed, 78 insertions(+), 11 deletions(-)
+
+e2ab108 2026-11-18 S4: G2 r1 review log, budget; brief revision r2
+
+ .work/briefs/S4-model.md | 11 +++++++++++
+ .work/state.md           |  2 +-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+a67d968 2026-11-18 S4: G2 r1 report (model); duplicates marked
+
+ .work/issues/model.G2.assumption-auditor.r1.json | 37 ++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+
+37cf748 2026-11-18 S4: G1 r1 review log, budget
+
+ .work/briefs/S4-model.md | 1 +
+ .work/state.md           | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+39f4d3b 2026-11-18 S4: G1 r1 report (model)
+
+ .work/issues/model.G1.conformance-reviewer.r1.json | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+dc84a64 2026-11-18 S4: G0 r1 review log, budget
+
+ .work/briefs/S4-model.md | 1 +
+ .work/state.md           | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+1a2b568 2026-11-18 S4: G0 r1 report (model)
+
+ .work/issues/model.G0.lint-tex.r1.json | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+8f73e06 2026-11-18 S4: modeler draft of model.md and model section
+
+ .work/briefs/S4-model.md |  29 +++++++++-
+ .work/glossary.md        |  15 ++++--
+ .work/model.md           | 134 +++++++++++++++++++++++++++++++++++++++++++----
+ paper/lemmas.tex         |  92 ++++++++++++++++++++++++++++++++
+ paper/macros.tex         |  13 +++++
+ paper/main.tex           |  17 ++++++
+ 6 files changed, 284 insertions(+), 16 deletions(-)
+
+ff5c284 2026-11-18 S4: brief S4-model
+
+ .work/briefs/S4-model.md | 65 ++++++++++++++++++++++++++++++++++++++++++++++++
+ .work/state.md           |  4 +--
+ 2 files changed, 67 insertions(+), 2 deletions(-)
+
+fd0f151 2026-11-18 intake: contract and playbook approved
+
+ .work/approvals.md | 1 +
+ .work/contract.md  | 8 ++++----
+ .work/state.md     | 6 +++---
+ 3 files changed, 8 insertions(+), 7 deletions(-)
+
+29c7db6 2026-11-18 intake: scaffold .work, contract, trimmed new-paper playbook
+
+ .work/approvals.md          | 23 ++++++++++++++
+ .work/briefs/_template.md   | 54 ++++++++++++++++++++++++++++++++
+ .work/claims.md             | 34 ++++++++++++++++++++
+ .work/contract.md           | 75 +++++++++++++++++++++++++++++++++++++++++++++
+ .work/deadends.md           |  6 ++++
+ .work/decisions.md          | 14 +++++++++
+ .work/glossary.md           | 42 +++++++++++++++++++++++++
+ .work/handoffs/_template.md | 25 +++++++++++++++
+ .work/issues/README.md      | 64 ++++++++++++++++++++++++++++++++++++++
+ .work/model.md              | 42 +++++++++++++++++++++++++
+ .work/state.md              | 31 +++++++++++++++++++
+ CLAUDE.md                   | 29 ++++++++++++++++++
+ resources/BRIEF.md          |  8 +++++
+ 13 files changed, 447 insertions(+)
+
+15eb251 2026-11-18 pilot: resources
+
+ .gitignore         |  2 ++
+ resources/BRIEF.md | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ resources/notes.md | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 90 insertions(+)
