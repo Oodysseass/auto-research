@@ -16,11 +16,14 @@ Written by `/intake`. Binding for every agent. Changing it after approval needs 
 
 ## Requirements
 
-Every requirement has a source. Source is a file and section in `resources/`, or `human: <date>` for an instruction from me.
+Every requirement points to a line of `resources/BRIEF.md` (`resources/BRIEF.md:<line>`) or of the SoW
+(`resources/<sow file>:<line>`, or page and section for a PDF). An instruction from me goes into the project brief first, under a dated heading.
+The SoW governs scope. The project brief governs approach. I resolve any conflict between them, and the answer is added to the project brief.
 
 | ID | Requirement | Source | Deliverable |
 |---|---|---|---|
-| R1 | <one line> | <resources/sow.pdf, Sec. 2.1> | D1 |
+| R1 | <one line> | <resources/sow.pdf, p. 3, Sec. 2.1> | D1 |
+| R2 | <one line> | <resources/BRIEF.md:14> | D1 |
 
 ## Scope
 
@@ -29,6 +32,16 @@ In scope:
 
 Out of scope:
 - <item>
+
+## G1 checks
+
+Explicit checks for the conformance reviewer, on every artifact. Taken from the project brief `resources/BRIEF.md`: research "Position" (P-IDs) and
+"Not interested in" (N-IDs); client "Out of scope even if the SoW is vague" (N-IDs).
+
+| ID | Check | Source |
+|---|---|---|
+| P1 | <the artifact does not contradict the expected answer without saying so and flagging it for me> | <resources/BRIEF.md:9> |
+| N1 | <the artifact does not pursue: item> | <resources/BRIEF.md:30> |
 
 ## Deliverables
 

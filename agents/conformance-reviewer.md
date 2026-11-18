@@ -21,7 +21,7 @@ Every artifact, before G2. Again on the final deliverable of each milestone.
 
 ## Read first
 
-The brief, then the artifact, then `.work/contract.md`, `.work/model.md`, `.work/glossary.md`, `.work/claims.md`.
+The brief, then the artifact, then `.work/contract.md` (including its G1 checks), `.work/model.md`, `.work/glossary.md`, `.work/claims.md`.
 For client work, the SoW in `resources/` that the contract's requirement pointers name.
 Earlier rounds of your own report and the producer responses for this artifact.
 
@@ -34,6 +34,9 @@ Earlier rounds of your own report and the producer responses for this artifact.
 5. Claim strength. No sentence states a claim stronger than its status. A `draft` or `checked` result written as proven is blocking; a `refuted` result cited as true is blocking.
 6. Terminology and notation. Glossary terms only, no synonyms. Project macros wherever one exists. Notation conventions of the glossary (indexing, prefix, length vs height).
 7. Output format. Files, locations and formats are those the brief names.
+8. G1 checks. Every row of the contract's `## G1 checks` table, by ID. A P-ID fails if the artifact contradicts or reframes the expected answer
+   in the project brief (`resources/BRIEF.md`) without stating the difference and flagging it for the human. An N-ID fails if the artifact pursues the excluded item.
+   A failed N-ID is `blocking`; a failed P-ID is `major`. Put the check ID in `evidence`.
 
 ## May write
 

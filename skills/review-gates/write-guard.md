@@ -1,6 +1,7 @@
 # Reviewer write guard
 
-Second layer of reviewer write enforcement. The first layer is the PreToolUse hook (Stage 5).
+Second layer of reviewer write enforcement. The first layer is the PreToolUse hook in `~/dotclaude/hooks/rw_hooks.py`:
+it denies any Write, Edit or NotebookEdit by a reviewer or arbiter except creating a new file in `.work/issues/`. It cannot see Bash writes, so this procedure still runs.
 The orchestrator runs this procedure around every reviewer dispatch (G1 to G4, any tier, and Codex at G3)
 and every arbiter dispatch. For an arbiter, "reviewer" below means the arbiter.
 

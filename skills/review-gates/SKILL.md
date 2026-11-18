@@ -54,7 +54,8 @@ A clean round is a round with zero blocking and zero major issues (minor issues 
 
 ## Stopping rules
 
-Check after every round, in this order.
+Check after every round, in this order. The orchestrator runs `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug>`,
+which applies these rules (setup Stage 6). Until it exists, apply them by hand and say so in `decisions.md`.
 
 1. Converged:
    - Non-critical artifact: one clean round of the gate.

@@ -153,7 +153,7 @@ Every verifier returns the issue JSON from Stage 2. Severity is required.
 - `/orch`: start a fresh orchestrator: read `state.md`, latest handoff, contract, approvals, open issues; pick the next stage of the playbook; write a brief; dispatch producers; run gates; update `claims.md`, `state.md`, `decisions.md`; finish with `/handoff`. **One playbook stage per session.** When it finishes a stage, it tells me to start a new session.
 - `/handoff`: write `handoffs/<timestamp>.md`, update `state.md`, commit.
 - `/gate <artifact>`: run gates on an artifact on demand.
-- `/status`: stage, open issues by severity, claims by status, pending approvals, budget.
+- `/status` (built as `/wstatus`: a skill named `status` would replace the built-in `/status`): stage, open issues by severity, claims by status, pending approvals, budget.
 - `/escalate <claim-or-issue>`: rerun a review one tier up.
 - `/retro`: after a milestone, propose additions to the domain skill, the playbooks or the rules card, based on issues found and deadends. Proposals only; I approve each.
 
@@ -183,6 +183,14 @@ Wire hooks in `settings.json`. Test each hook with a dry run and show me the out
 - runs `latexmk -synctex=1 -pdf -outdir=output main.tex` if `--build` is passed
 
 Output: the issue JSON format with gate `G0`. Write pytest tests with small fixture `.tex` files.
+
+**Added in Stage 5: convergence script.** `scripts/review_status.py` (stdlib only), built in this stage with pytest tests.
+Usage: `review_status.py .work/issues <artifact-slug>`. It reads every report, response and ruling for the artifact and prints one of
+`converged | deadlocked | stalled | max_rounds | open` per gate, applying the review-gates "Stopping rules" exactly, in their order:
+including the two-round rule for critical artifacts (main theorems, designs, final deliverables), where a clean G3 round at the same commit
+counts as the second clean round of G1 and G2; duplicates (`duplicate_of`); arbiter rulings; artifact hashes from the brief's Review log for
+stalls; the brief's round budget. The orchestrator (`/orch`), `/handoff` and `/wstatus` call it instead of applying the rules from memory.
+Tests: one fixture directory per outcome, plus the G3-as-second-round case, an edit between the two clean rounds, and a duplicate-only issue.
 
 ---
 

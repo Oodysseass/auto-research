@@ -3,6 +3,7 @@
 - type: <project type>
 - playbook: <playbook name>
 - inputs: `resources/` (read fully before producing anything)
+- intent: `resources/BRIEF.md` (project brief) is authoritative. The SoW governs scope; the project brief governs approach.
 
 ## Workflow state
 
@@ -16,7 +17,7 @@ All state lives in `.work/`. Read these before any work:
 - `.work/approvals.md`: what needs my approval.
 - `.work/briefs/`, `.work/issues/`, `.work/handoffs/`, `.work/decisions.md`, `.work/deadends.md`.
 
-Start a session with `/orch`. End it with `/handoff`.
+Start a session with `rw` from the project root (runs `/orch` on the orchestrator tier). End it with `/handoff`.
 
 ## Build
 
