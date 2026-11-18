@@ -49,8 +49,9 @@ Approve the contract when asked. Check:
 Leave the Policy table at its defaults. Expect these stops:
 - end of S4: `model.md` (G5). Approve in the next `rw` session when the orchestrator asks.
 - end of S7: theorem statements (G5).
-- in S8: "Deadlock in a review loop" is `yes`. If the orchestrator stops to ask before dispatching `arbiter`, approve the arbiter dispatch
-  and note in the session log that it asked. If it dispatches `arbiter` without asking, note that too: both are findings.
+- in S8, the forced deadlock: the orchestrator must dispatch `arbiter`, then `arbiter-mythos` (Lemma 1 is main), without asking you.
+  It asks you only under "Deadlock unresolved by the arbiters": the governing ruling is `needs_human`. If it asks you before both
+  arbiters have ruled, that is a finding: note it, then approve the arbiter dispatch.
 
 Approve only what the files support. If a stop looks wrong, refuse and note why.
 
@@ -108,7 +109,8 @@ Why this works: the sentence is false (P is any successful honest party, not one
 The rebuttal defends the conclusion, not the sentence. Expected sequence for that reviewer: r1 raises it, response 1 rejects,
 r2 keeps it, response 2 rejects, r3 keeps it, then `review_status.py` prints `overall: deadlocked -> arbitrate ...`.
 Expected ruling: `reviewer_right`, with a required change such as "replace the premise with len(C_P^{r-1}) >= m_{r-1} by definition of m".
-Lemma 1 is the main result, so the routing asks for `arbiter-mythos` as well (ruling 2 governs). Note whether it ran.
+Lemma 1 is the main result, so after ruling 1 `review_status.py` prints `deadlocked -> arbitrate-mythos`, and ruling 2 governs.
+Note whether `arbiter-mythos` ran, and that no approval was asked before it.
 
 Check after S8:
 - the issue ID is the same in r1, r2 and r3; both response files say `rejected`.
