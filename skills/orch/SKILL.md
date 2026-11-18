@@ -109,7 +109,10 @@ context; every turn re-reads the whole context, so cost per turn grows with it; 
 
 ## Procedure
 
-1. Check that `.work/state.md` exists. If not, stop: the project needs `/intake`.
+1. Check that `.work/state.md` exists. If not, stop: the project needs `/intake`. If `.work/threads.md` or `.work/ideas.md` is
+   missing, the project predates the agenda: run `python3 ~/dotclaude/scripts/project_update.py` (it seeds the agenda from the
+   playbook and the current stage) and show the agenda in chat (`agenda.py list`) before continuing. An open request
+   (`request.py list --status open`) is finished first: it is work the human committed and is waiting on.
    Then `python3 ~/dotclaude/scripts/repos.py check`. On exit 1 (`.work/` not a repo, a missing exclude line, or a workflow file
    tracked by the project repo): `repos.py init` fixes the first two. A tracked workflow file is a blocking card (untrack it with
    `git rm --cached`, message shown first, or stop); never untrack anything without the answer.

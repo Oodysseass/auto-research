@@ -67,3 +67,8 @@ def test_errors(root):
 def test_title_with_bar_survives(root):
     t = run(root, "add", "--title", "A | B", "--goal", "g").stdout.strip()
     assert json.loads(run(root, "list", "--json").stdout)[0]["title"] == "A / B" and t == "T1"
+
+
+def test_next_without_agenda_is_an_error(root):
+    r = run(root, "next")
+    assert r.returncode == 2 and "project_update.py" in r.stderr

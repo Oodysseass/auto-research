@@ -14,7 +14,7 @@ Statuses: exploring (discussed, not committed), committed (rw may work on it), p
 
 Usage (run from the project root, or pass --root):
   agenda.py list [--all] [--json]       threads in order; without --all, done and dropped are left out
-  agenda.py next [--json]               the first committed thread, or "none"
+  agenda.py next [--json]               the first committed thread, or "none" (exit 2 if threads.md is missing)
   agenda.py add --title T --goal G [--stage S<n>] [--covers IDS] [--status exploring|committed] [--source S]
                 [--top | --before T<n> | --after T<n>]        (default: after the last open thread)
   agenda.py move T<n> (--top | --bottom | --before T<m> | --after T<m>)
@@ -153,6 +153,9 @@ def do_list(root, all_, as_json):
 
 
 def do_next(root, as_json):
+    if not path(root).is_file():
+        raise UsageError("no .work/threads.md: this project predates the agenda; run "
+                         "python3 ~/dotclaude/scripts/project_update.py first")
     _, threads = load(root)
     t = next((t for t in threads if t["status"] == "committed"), None)
     if as_json:

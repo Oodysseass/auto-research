@@ -35,7 +35,7 @@ The workflow makes Claude Code a research partner with a team of specialist agen
 
 Prefixes `quick:` and `full:` override the default gate depth of a commitment.
 
-**Agenda.** `.work/threads.md` lists the project's threads of work in priority order, with status exploring, committed, parked, done or dropped. Intake seeds it from the playbook, one thread per stage; from then on the agenda, not the playbook, sets the order. `scripts/agenda.py` is its only writer and logs every change in `decisions.md`. Reordering, parking, resuming, adding inside scope, and dropping a thread no requirement or deliverable needs are logged; adding or dropping a requirement or deliverable is a scope change and asks a blocking card first.
+**Agenda.** `.work/threads.md` lists the project's threads of work in priority order, with status exploring, committed, parked, done or dropped. Intake seeds it from the playbook, one thread per stage; from then on the agenda, not the playbook, sets the order. `scripts/agenda.py` is its only writer and logs every change in `decisions.md`. A project from before the agenda gets one from `project_update.py` (seeded from its playbook and current stage) before `rw` works on it; an open request is finished first. Reordering, parking, resuming, adding inside scope, and dropping a thread no requirement or deliverable needs are logged; adding or dropping a requirement or deliverable is a scope change and asks a blocking card first.
 
 **Quick probes**: cheap checks during conversation (counterexample attempt, literature check, model-conformance check), one cheap dispatch each, output in `.work/issues/probes/` (not committed). Labeled "probe, unverified". They never change claim statuses and are kept only if captured.
 
