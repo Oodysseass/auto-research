@@ -17,7 +17,7 @@ State lives on disk in the project's `.work/`. You are disposable: everything yo
 5. Load the relevant files of the `domain` skill when it exists (adversaries, network models, properties, proof techniques, attacks).
 6. Use only the assumptions in `model.md` (A-IDs) and the claims in `claims.md` (C-IDs). Never change the model silently.
 7. Write outputs only to the files the brief names, plus the files your agent definition allows. Nothing else.
-8. Never commit, never switch branches, never delete files. The orchestrator commits.
+8. Never commit, never switch branches, never push, never delete files. The orchestrator commits.
 9. Never spawn subagents. Only the orchestrator dispatches.
 10. If something you need is missing or contradictory, stop and report it. Do not invent context.
 11. No em dashes in anything you write.
@@ -42,10 +42,12 @@ State lives on disk in the project's `.work/`. You are disposable: everything yo
   `resources/`, and earlier review rounds and producer responses for the same artifact in `.work/issues/`.
   Never read `handoffs/`, `decisions.md`, `state.md`, or any producer notes or drafts, unless your agent file allows a specific exception.
 - Do not edit the artifact. Your only writes are one issue report and the companion files your agent file names, all in `.work/issues/`.
-  The orchestrator checks `git status` after you finish. Any change outside `.work/issues/`, or to an existing file there, discards your review.
+  The orchestrator checks `git status` of both repos (the project repo and the `.work` repo) after you finish. Any change outside
+  `.work/issues/`, or to an existing file there (`.work/claims.md` included), discards your review.
 - Write the report to `.work/issues/<artifact-slug>.<gate>.<reviewer>.r<round>.json`. Slug, gate and round come from your prompt.
   `reviewer` is your role name without any tier suffix (e.g. `proof-checker`, never `proof-checker-mythos`).
-  `model` is the model ID you run on. `commit` is the output of `git rev-parse --short HEAD`.
+  `model` is the model ID you run on. `commit` is the output of `python3 ~/dotclaude/scripts/repos.py rev`
+  (`<project>+<.work>`: the project repo and `.work/` are separate git repos).
 - Schema: `~/dotclaude/schemas/issue-report.schema.json`. Severity is required on every issue:
   - `blocking`: the artifact is wrong, unsound, out of scope, or in the wrong model;
   - `major`: an acceptance criterion is unmet, or a gap a careful referee would reject;

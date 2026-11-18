@@ -52,7 +52,8 @@ Automatic. Never shown to the human. `tokens` from `python3 ~/dotclaude/scripts/
 
 One row per review round. `hashes`: the output of `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug> --hashes`,
 taken after the round's reports are committed. It covers the artifact files, `model.md`, `glossary.md`, and the `claims.md`
-entries of the claims above and their dependencies. `review_status.py` reads this table: keep the columns.
+entries of the claims above and their dependencies. `commit`: `<project>+<.work>` from `repos.py rev`.
+`review_status.py` reads this table: keep the columns.
 
 | round | gate | reviewer | model | commit | verdict | blocking | major | minor | hashes |
 |---|---|---|---|---|---|---|---|---|---|

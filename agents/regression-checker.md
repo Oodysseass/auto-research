@@ -20,7 +20,8 @@ After every producer round that edits LaTeX, pseudocode, `model.md` or `glossary
 
 ## Read first
 
-Your prompt names a base commit. Run `git diff --name-only <base> HEAD` and `git diff <base> HEAD`. Read `.work/claims.md` in full, and `.work/model.md` if it changed.
+Your prompt names a base commit `<project>+<.work>` (the project repo and `.work/` are separate repos). Run
+`python3 ~/dotclaude/scripts/repos.py diff <base> --name-only` and `python3 ~/dotclaude/scripts/repos.py diff <base>`: both repos, project-relative paths. Read `.work/claims.md` in full, and `.work/model.md` if it changed.
 
 ## Method
 

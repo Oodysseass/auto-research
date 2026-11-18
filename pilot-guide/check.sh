@@ -5,9 +5,18 @@ P=${PILOT_DIR:-$HOME/dotclaude/pilot}
 cd "$P" || { echo "no pilot repo at $P"; exit 2; }
 S=${1:-?}
 echo "=== pilot check after session $S, $(date '+%Y-%m-%d %H:%M')"
-echo; echo "--- git: branch, last commits, dirty files"
-git branch --show-current; git log --oneline -8; git status --porcelain
-[ -d .work ] || { echo; echo "no .work/ yet (run /intake)"; exit 0; }
+R=~/dotclaude/scripts
+echo; echo "--- project repo: branch, last commits, dirty files"
+git branch --show-current; git log --oneline -8 2>/dev/null; git status --porcelain --untracked-files=all
+[ -f .work/state.md ] || { echo; echo "no .work/state.md yet (run /intake)"; exit 0; }
+echo; echo "--- .work repo: last commits, dirty files"
+git -C .work log --oneline -8 2>/dev/null; git -C .work status --porcelain --untracked-files=all
+echo; echo "--- repos check (workflow files tracked by the project repo must be none)"
+python3 $R/repos.py check
+echo; echo "--- workflow files in the project repo's history: must print nothing"
+git log --all --name-only --format= 2>/dev/null | grep -E '^(\.work/|CLAUDE\.md$|\.claude/|resources/|output/|\.gitignore$)' | sort -u | sed 's/^/  /'
+echo; echo "--- resources manifest"
+python3 $R/resources.py scan
 echo; echo "--- state.md (head)"; sed -n 1,30p .work/state.md
 echo; echo "--- latest handoff"; ls -t .work/handoffs/*.md 2>/dev/null | grep -v _template | head -1
 echo; echo "--- claims: id, label, status, refuted_by, verified_by"
@@ -45,19 +54,29 @@ done
 echo; echo "--- usage logged by the hook (information only)"
 [ -f .work/usage.tsv ] && awk -F'\t' 'NR>1{t[$4]+=$6; s+=$6} END{for(b in t) printf "  %s %dk\n", b, t[b]/1000; printf "  total %dk\n", s/1000}' .work/usage.tsv
 echo; echo "--- rw session-end marker"; cat .work/.rw/end.json 2>/dev/null || echo "  none"
-echo; echo "--- commit messages (commit-style): must print nothing"
-git log --all --format='%h %s%n%b' | grep -niE 'co-authored|claude|anthropic|\bAI\b|agent|generated|opus|sonnet|mythos|codex|reviewer|checker|auditor|hunter' | sed 's/^/  /'
-git log --all --format='%h %s' | grep -E '^[0-9a-f]+ ([A-Z]|[A-Za-z0-9/-]+: )' | sed 's/^/  capitalized or prefixed: /'
+echo; echo "--- commit messages (commit-style), both repos: must print nothing"
+TOOLS='co-authored|claude|anthropic|\bAI\b|agent|generated|opus|sonnet|mythos|codex|reviewer|checker|auditor|hunter'
+WORKFLOW='brief|review|round|\bgate|playbook|\bS[0-9]+\b|handoff|approv|provisional|workflow|orchestrat|\.work|decision card|contract and playbook'
+for repo in . .work; do
+  git -C $repo log --all --format='%h %s%n%b' 2>/dev/null | grep -niE "$TOOLS" | sed "s|^|  $repo: |"
+  git -C $repo log --all --format='%h %s' 2>/dev/null | grep -E '^[0-9a-f]+ ([A-Z]|[A-Za-z0-9/-]+: )' | sed "s|^|  $repo capitalized or prefixed: |"
+done
+git log --all --format='%h %s' 2>/dev/null | grep -iE "$WORKFLOW" | sed 's/^/  workflow term in a project repo commit: /'
+git branch -r 2>/dev/null | grep -E 'work/|workflow-migration' | sed 's/^/  workflow branch on a remote: /'
+git -C .work remote -v 2>/dev/null | sed 's/^/  .work repo has a remote: /'
 echo; echo "--- decisions.md (last 25 lines)"; tail -25 .work/decisions.md
 echo; echo "--- approvals log"; sed -n '/^## Log/,$p' .work/approvals.md
 echo; echo "--- leaks (blindness): must print nothing"
 GUIDE='pilot-guide|PILOT\.md|check\.sh|pilot instruction|instruction from the human|deadlock test|forc(e|ed|ing) (the|a) deadlock|planted'
 PLANT='longest chain held by any honest'
 grep -rniE "$GUIDE" --exclude-dir=.git . 2>/dev/null | sed 's/^/  guide or test mentioned: /'
-git log --all --format='%H %s%n%b' | grep -niE "$GUIDE" | sed 's/^/  in a commit message: /'
-git log --all -p | grep -niE "^\+.*($GUIDE)" | sed 's/^/  in git history: /'
+for repo in . .work; do
+  git -C $repo log --all --format='%H %s%n%b' 2>/dev/null | grep -niE "$GUIDE" | sed "s|^|  in a commit message ($repo): |"
+  git -C $repo log --all -p 2>/dev/null | grep -niE "^\+.*($GUIDE)" | sed "s|^|  in git history ($repo): |"
+done
 grep -rnil "$PLANT" --exclude-dir=.git --exclude-dir=paper --exclude-dir=issues . 2>/dev/null | sed 's/^/  planted sentence outside paper\/ and issues\/: /'
-git log --all -p -- . ':(exclude)paper' ':(exclude).work/issues' | grep -niE "^\+.*$PLANT" | sed 's/^/  planted sentence in history outside paper\/ and issues\/: /'
+git log --all -p -- . ':(exclude)paper' 2>/dev/null | grep -niE "^\+.*$PLANT" | sed 's/^/  planted sentence in project history outside paper\/: /'
+git -C .work log --all -p -- . ':(exclude)issues' 2>/dev/null | grep -niE "^\+.*$PLANT" | sed 's/^/  planted sentence in .work history outside issues\/: /'
 echo; echo "--- style"
 grep -rln "$(printf '\342\200\224')" .work paper resources 2>/dev/null | sed 's/^/  em dash in: /'
 [ -f paper/main.tex ] && { python3 ~/dotclaude/scripts/lint_tex.py --root . paper > /dev/null; echo "  lint_tex exit: $? (0 accept, 1 revise)"; }

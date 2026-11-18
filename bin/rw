@@ -11,6 +11,11 @@ session (AskUserQuestion; a hook sends a notification). The session ends only th
   limit                notify; wait until the usage limit resets (Enter resumes early), then start the next session
   project-done, error  notify and stop
   no marker            the human quit the session: stop
+Before the first session rw checks the two-repo layout (scripts/repos.py check): .work/ is its own git repo, the project
+repo's .git/info/exclude keeps workflow files out, and the project repo tracks no workflow file. It refuses to start otherwise.
+It also prints how many files in resources/ the first session will process (scripts/resources.py).
+Run it from the project root, the directory that contains .work/. That may be a subdirectory of the project repo
+(several projects can share one repo); the checks then cover that subdirectory only.
 Ctrl+C between sessions stops the loop. Inside a session, Ctrl+C belongs to Claude Code; quitting it stops the loop.
 Stdlib only. Test hooks: $RW_CLAUDE (the claude command), $RW_NOTIFY_CMD, $RW_POLL (seconds), $RW_MAX_SESSIONS.
 """
@@ -139,7 +144,21 @@ def main(argv):
         argv = argv[:i] + argv[i + 2:]
     if not Path(".work/state.md").is_file():
         print(f"rw: no .work/state.md in {os.getcwd()}. cd to the project root, or run /intake first.", file=sys.stderr)
+        found = sorted(p.parent.parent for p in Path(".").glob("*/**/.work/state.md") if ".work" not in p.parent.parent.parts)
+        if found:
+            print("rw: projects below this directory: " + ", ".join(p.as_posix() for p in found[:10]), file=sys.stderr)
         return 2
+    chk = subprocess.run([sys.executable, str(DOTCLAUDE / "scripts" / "repos.py"), "check"], capture_output=True, text=True)
+    if chk.returncode != 0:
+        print("rw: the project's repos are not set up for the workflow:\n" + chk.stdout + chk.stderr +
+              "rw: `python3 ~/dotclaude/scripts/repos.py init` makes .work/ its own repo and adds the exclude lines.\n"
+              "rw: a workflow file tracked by the project repo must be untracked first (ask in a plain `claude` session).\n"
+              "rw: projects in the old one-repo layout: follow ~/dotclaude/setup-prompts/03_migrate_project.md.", file=sys.stderr)
+        return 2
+    res = subprocess.run([sys.executable, str(DOTCLAUDE / "scripts" / "resources.py"), "scan"], capture_output=True, text=True)
+    last = (res.stdout.strip().splitlines() or [""])[-1]
+    if res.returncode == 0 and last.startswith("resources:") and last != "resources: 0 new, 0 edited, 0 deleted":
+        say(f"{last[len('resources: '):]} in resources/; the first session processes them")
     try:
         subprocess.run([sys.executable, str(DOTCLAUDE / "scripts" / "budgets.py"), "recalibrate"],
                        capture_output=True, timeout=30)

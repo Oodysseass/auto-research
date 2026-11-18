@@ -33,6 +33,12 @@ A deadlock gives `arbitrate`, then `arbitrate-mythos` (ruling 1 needs_human, or 
 when the governing ruling is needs_human or the producer rejects again after reviewer_right.
 `open -> next-gate` means a critical artifact has one clean round of the gate and may move on:
 a clean G3 round on the same content completes it. Exit 0, or 2 on usage errors.
+
+Two repos: the artifact files live in the project repo, model.md, glossary.md and claims.md in the .work repo (repos.py).
+Content is compared by the hashes above, which read both from disk. A report's `commit` is `<project>+<.work>`
+(repos.py rev). It is used only when a round has no hashes, and then both parts must match: an edit to claims.md
+moves the .work part even when the project repo's HEAD is unchanged. For a project in a subdirectory of the project repo,
+the project part is the last commit that touched the subdirectory, so commits elsewhere in the repo never change it.
 """
 import argparse
 import hashlib
@@ -203,6 +209,12 @@ def same_hash(a, b):
     return n >= 7 and a[:n] == b[:n]
 
 
+def same_commit(r1, r2):
+    """Same `<project>+<.work>` commit. A legacy single-repo commit only matches the same legacy value."""
+    c1, c2 = str(r1.get("commit") or ""), str(r2.get("commit") or "")
+    return bool(c1) and c1 == c2
+
+
 def same_content(h1, h2):
     """Two {file: hash} maps describe the same content."""
     return bool(h1) and set(h1) == set(h2) and all(same_hash(h1[f], h2[f]) for f in h1)
@@ -293,7 +305,7 @@ def stream_status(ctx, gate, reviewer):
                     continue
                 for r3, rep3 in g3.items():
                     h3 = ctx.round_hashes(g, rv, r3)
-                    same = same_content(h3 or {}, h_last or {}) if (h3 or h_last) else rep3.get("commit") == rep.get("commit")
+                    same = same_content(h3 or {}, h_last or {}) if (h3 or h_last) else same_commit(rep3, rep)
                     if ctx.is_clean(rep3) and same:
                         return {"status": "converged", "action": "none",
                                 "reason": f"clean round r{last} and clean G3 {rv} r{r3} on the same content"}

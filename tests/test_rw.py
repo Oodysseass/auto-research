@@ -38,6 +38,9 @@ time.sleep(30)  # the session stays open until rw ends it
 def setup(tmp_path):
     proj = tmp_path / "proj"
     (proj / ".work").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", str(proj)], check=True)
+    subprocess.run([sys.executable, str(ROOT / "scripts" / "repos.py"), "--root", str(proj), "init"], check=True,
+                   capture_output=True)
     (proj / ".work/state.md").write_text("# State\n")
     fake = tmp_path / "claude"
     fake.write_text(FAKE)
@@ -121,3 +124,19 @@ def test_stop_before_stage(setup):
     (proj / ".work/state.md").write_text("# State\n\n- stage: 6 (S80 other)\n")
     r, _ = rw(proj, dict(env, FAKE_STAGES="x"), "project-done", "--stop-before", "S8")
     assert "project done" in r.stdout
+
+
+def test_refuses_without_work_repo(setup, tmp_path):
+    proj, env, tmp = setup
+    import shutil
+    shutil.rmtree(proj / ".work" / ".git")
+    r, _ = rw(proj, env, "quit")
+    assert r.returncode == 2 and ".work repo: MISSING" in r.stderr and not calls(tmp)
+
+
+def test_refuses_when_project_repo_tracks_workflow_file(setup):
+    proj, env, tmp = setup
+    (proj / "CLAUDE.md").write_text("# Project\n")
+    subprocess.run(["git", "-C", str(proj), "add", "-f", "CLAUDE.md"], check=True)
+    r, _ = rw(proj, env, "quit")
+    assert r.returncode == 2 and "workflow files tracked by the project repo: CLAUDE.md" in r.stderr and not calls(tmp)

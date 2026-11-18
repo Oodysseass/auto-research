@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Gate G3 cross-model review with the Codex CLI. See SKILL.md in this directory.
 #
-# Usage (from the project root):
+# Usage (from the project root, the directory that contains .work/; it may be a subdirectory of the project repo):
 #   codex_review.sh --artifact <path[#label]> --slug <slug> --round <n> --brief <path>
 #                   [--claims C1,C3] [--model <codex model>] [--effort <level>|highest]
 #   --effort highest: the highest reasoning effort Codex lists for the model (G3 on critical artifacts).
@@ -14,6 +14,7 @@ SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 DOTCLAUDE="$(cd "$SKILL_DIR/../.." && pwd -P)"
 REPORT_SCHEMA="$DOTCLAUDE/schemas/issue-report.schema.json"
 VALIDATOR="$DOTCLAUDE/scripts/validate_issue_json.py"
+REPOS="$DOTCLAUDE/scripts/repos.py"
 OUTPUT_SCHEMA="$SKILL_DIR/codex-output.schema.json"
 PROMPT_TEMPLATE="$SKILL_DIR/prompt.md"
 CODEX="${CODEX_BIN:-codex}"
@@ -67,7 +68,6 @@ fi
 
 # ---- Project and contract ----
 [ -f .work/contract.md ] || die 2 "run from the project root (.work/contract.md not found)"
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die 2 "not inside a git repository"
 ROOT="$(pwd -P)"
 
 tools_line="$(grep -m1 -E '^[[:space:]]*-?[[:space:]]*ai_tools_allowed[[:space:]]*:' .work/contract.md || true)"
@@ -77,11 +77,10 @@ if [ -n "$tools_line" ]; then
   fi
 fi
 
-# ---- Write guard, before dispatch ----
-[ -z "$(git status --porcelain --untracked-files=all)" ] \
-  || die 2 "working tree is not clean. Commit first (write guard, before dispatch)."
-BASE="$(git rev-parse HEAD)"
-COMMIT="$(git rev-parse --short HEAD)"
+# ---- Write guard, before dispatch: both repos (project and .work) clean ----
+BASE="$(python3 -I "$REPOS" --root "$ROOT" guard-begin)" \
+  || die 2 "the project repo or the .work repo is not clean, or .work/ is not a repo. Commit first (write guard, before dispatch)."
+COMMIT="$(python3 -I "$REPOS" --root "$ROOT" rev)"
 
 "$CODEX" login status 2>&1 | grep -q "ChatGPT" \
   || die 2 "Codex is not signed in with ChatGPT. Run: codex login"
@@ -118,28 +117,17 @@ run_codex() {  # $1 prompt file, $2 last-message file
     --output-schema "$OUTPUT_SCHEMA" --output-last-message "$2" - <"$1" >>"$TMP/codex.log" 2>&1
 }
 
-guard() {  # Write guard, after the reviewer returns. Reverts and exits 3 on any change.
-  local status head
-  status="$(git status --porcelain --untracked-files=all)"
-  head="$(git rev-parse HEAD)"
-  [ -z "$status" ] && [ "$head" = "$BASE" ] && return 0
+guard() {  # Write guard, after the reviewer returns, on both repos. Reverts and exits 3 on any change.
+  local report
+  report="$(python3 -I "$REPOS" --root "$ROOT" guard-check --base "$BASE" --revert)" && return 0
   {
     echo
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    echo "codex_review: CODEX CHANGED THE REPOSITORY. REVIEW DISCARDED."
-    [ "$head" != "$BASE" ] && echo "HEAD moved from $BASE to $head. Not reset automatically: inspect it."
-    [ -n "$status" ] && { echo "Changed paths:"; printf '%s\n' "$status"; }
+    echo "codex_review: CODEX CHANGED THE PROJECT REPO OR THE .work REPO. REVIEW DISCARDED."
+    printf '%s\n' "$report"
+    echo "A moved HEAD is not reset automatically: inspect it. Log the violation in decisions.md (write-guard.md, step 4.5)."
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
   } >&2
-  if [ -n "$status" ]; then
-    git restore --staged --worktree --source="$BASE" -- :/ 2>/dev/null
-    git clean -f -- :/ >/dev/null
-    if [ -z "$(git status --porcelain --untracked-files=all)" ]; then
-      echo "Reverted to $BASE. Log the violation in decisions.md (write-guard.md, step 4.5)." >&2
-    else
-      echo "REVERT INCOMPLETE. Remaining:" >&2; git status --porcelain --untracked-files=all >&2
-    fi
-  fi
-  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
   exit 3
 }
 

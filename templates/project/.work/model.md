@@ -4,7 +4,7 @@ Binding for every agent. Proofs and arguments may use only the assumptions liste
 Changing it after approval needs human approval (see `approvals.md`).
 
 - status: <draft | approved>
-- approved at commit: <hash>
+- approved at commit: <project>+<.work> (`repos.py rev`)
 
 ## Parties
 

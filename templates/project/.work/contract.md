@@ -54,5 +54,5 @@ Explicit checks for the conformance reviewer, on every artifact. Taken from the 
 - status: <pending | approved>
 - approved by: <human>
 - date: <YYYY-MM-DD>
-- commit: <hash>
+- commit: <project>+<.work> (`repos.py rev`)
 - changes since approval: <none | list with date and approval reference>

@@ -7,7 +7,9 @@
 
 ## Workflow state
 
-All state lives in `.work/`. Read these before any work:
+All state lives in `.work/`, its own local git repo. The project repo never tracks `.work/`, this file, `.claude/`,
+`resources/` or `output/` (`.git/info/exclude`). Paper and code commit in the project repo, without workflow terms, through
+`python3 ~/dotclaude/scripts/repos.py commit`, which stages only this project's directory; `.work/` commits in the `.work` repo. Neither `.work` nor a `work/*` branch is ever pushed. Read these before any work:
 
 - `.work/contract.md`: scope, requirements (R-IDs), deliverables. Binding.
 - `.work/model.md`: model and assumptions (A-IDs). Binding.
@@ -17,8 +19,9 @@ All state lives in `.work/`. Read these before any work:
 - `.work/approvals.md`: the class of every question to me (blocking, checkpoint, logged).
 - `.work/decisions/`: one card per question to me. `.work/packets/`: approval packets.
 - `.work/briefs/`, `.work/issues/`, `.work/handoffs/`, `.work/decisions.md`, `.work/deadends.md`.
+- `.work/resources.manifest`: every file seen in `resources/`, which is append-only. New files are processed at session start.
 
-Run `rw` from the project root. It loops: one orchestrator session per stage, each with fresh context, asking me inside the
+Run `rw` from the project root (the directory that contains `.work/`). It loops: one orchestrator session per stage, each with fresh context, asking me inside the
 session and notifying me when my input is needed. `/why <ID>` explains any claim, assumption, decision or issue.
 
 ## Build

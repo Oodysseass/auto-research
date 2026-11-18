@@ -19,7 +19,10 @@ Three prompts, run in this order. Each one is staged and stops for your approval
 
 - New project: create the dir, put inputs in `resources/` (SoW, papers, notes), run `/intake`.
 - Work: `/orch` starts a fresh orchestrator, which does one stage and writes a handoff. When it says so, start a new session and run `/orch` again.
-- `/status` shows the stage, open issues, claims and pending approvals.
+- `/wstatus` shows the stage, open issues, claims, pending approvals, whether both repos are clean, and new inputs.
+- Two repos per project: the project repo (paper, code, shared) and `.work/` (workflow state, local, never pushed).
+  The project repo never tracks `.work/`, `CLAUDE.md`, `.claude/`, `resources/` or `output/` (`.git/info/exclude`).
+- `resources/` is append-only: drop new inputs there at any time; the next session reads them and asks if they change the contract.
 - `/gate <artifact>` runs the review gates on demand.
 
 ## Model note

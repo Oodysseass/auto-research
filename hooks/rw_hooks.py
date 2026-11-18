@@ -4,6 +4,8 @@
 Events: session-start, prompt, pre-compact, stop, pre-tool-use, ask, post-agent, stop-failure, statusline.
 Every hook does nothing unless $CLAUDE_PROJECT_DIR/.work/ exists (fallback: the input's cwd), except statusline,
 which prints a status line in every project and caches context and usage-limit data for the other hooks.
+Two repos per project (scripts/repos.py): the project repo, and .work/ as its own repo. Hooks track both.
+The project may live in a subdirectory of the project repo; then hooks see only that subdirectory of it (repos.py).
 Notifications: $RW_NOTIFY_CMD <title> <message> if set, else osascript on macOS.
 bin/rw sets RW_LOOP=1 and RW_RUN=<id>; the Stop hook uses them to end a session after /handoff.
 Internal errors fail open: exit 0 with no output, so a bug never blocks a session.
@@ -20,6 +22,10 @@ from datetime import datetime
 from pathlib import Path
 
 DOTCLAUDE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(DOTCLAUDE / "scripts"))
+import repos  # noqa: E402
+
+repos.TIMEOUT = 5
 RULES_CARD = DOTCLAUDE / "rules-card.md"
 STATE_DIR = Path(os.environ.get("RW_HOOKS_STATE_DIR", Path(tempfile.gettempdir()) / "rw-hooks"))
 STATE_LINES, HANDOFF_LINES = 80, 60
@@ -58,8 +64,16 @@ def file_hash(p):
         return None
 
 
+def heads(proj):
+    """HEAD of the project repo (for a project in a subdirectory: the last commit that touched it) and of the .work repo
+    (None for a repo without commits)."""
+    top, sub = repos.layout(proj)
+    return {"project": repos.repo_head(top, sub) if top else None,
+            "work": git(proj / ".work", "rev-parse", "--verify", "-q", "HEAD") if (proj / ".work" / ".git").exists() else None}
+
+
 def snapshot(proj):
-    """Fingerprint of the session-relevant state: HEAD, state.md, and every other file under .work/."""
+    """Fingerprint of the session-relevant state: HEADs of both repos, state.md, and every other file under .work/."""
     work = proj / ".work"
     files = {}
     for p in sorted(work.rglob("*")):
@@ -67,7 +81,7 @@ def snapshot(proj):
         if (p.is_file() and not any(part.startswith(".") for part in rel.parts) and p != work / "state.md"
                 and str(rel) not in AUTO_FILES):
             files[str(rel)] = file_hash(p)
-    return {"head": git(proj, "rev-parse", "HEAD"), "state": file_hash(work / "state.md"), "work": files}
+    return {"heads": heads(proj), "state": file_hash(work / "state.md"), "work": files}
 
 
 def baseline_path(inp):
@@ -98,9 +112,13 @@ def unrecorded_work(inp, proj):
         return None
     changed = sorted(k for k in set(now["work"]) | set(base["work"]) if now["work"].get(k) != base["work"].get(k))
     commits = []
-    if base["head"] and now["head"] and now["head"] != base["head"]:
-        log = git(proj, "log", "--oneline", f"{base['head']}..{now['head']}")
-        commits = log.splitlines() if log else [now["head"][:7]]
+    old = base.get("heads") or {"project": base.get("head"), "work": None}
+    top, sub = repos.layout(proj)
+    for name, cwd, spec in (("project", top or proj, repos.spec(sub)), ("work", proj / ".work", [])):
+        a, b = old.get(name), now["heads"].get(name)
+        if b and a != b:
+            log = git(cwd, "log", "--oneline", f"{a}..{b}" if a else b, *spec)
+            commits += [f"{name} {c}" for c in (log.splitlines() if log else [b[:7]])]
     if not changed and not commits:
         return None
     return commits, changed
@@ -114,6 +132,19 @@ def describe(commits, changed):
         shown = ", ".join(f".work/{c}" for c in changed[:5])
         parts.append(f"edits to {shown}" + (f" and {len(changed) - 5} more" if len(changed) > 5 else ""))
     return " and ".join(parts)
+
+
+def fmt_heads(h):
+    return f"project {(h.get('project') or 'none')[:7]}, .work {(h.get('work') or 'none')[:7]}"
+
+
+def combined_status(proj):
+    """`git status --porcelain` of both repos (the project repo limited to the project), project-relative paths;
+    .work repo paths prefixed with .work/."""
+    try:
+        return "\n".join(f"{code} {path}" for code, path in repos.status_lines(proj))
+    except (OSError, subprocess.SubprocessError):
+        return ""
 
 
 def head_lines(p, n):
@@ -167,15 +198,15 @@ def write_snapshot(inp, proj, why):
     out = proj / ".work" / "handoffs" / f"{ts}-{tag}.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     commits, changed = pending
-    status = git(proj, "status", "--porcelain") or "clean"
+    status = combined_status(proj) or "clean"
     out.write_text(
         f"# Snapshot handoff {ts} (automatic, before {why})\n\n"
         "Written by a hook, not by /handoff. The next orchestrator runs /handoff first; it folds this file in.\n\n"
-        f"- session HEAD at start: {base.get('head') or 'none'}\n"
-        f"- HEAD now: {git(proj, 'rev-parse', 'HEAD') or 'none'}\n\n"
+        f"- HEADs at session start: {fmt_heads(base.get('heads') or {'project': base.get('head')})}\n"
+        f"- HEADs now: {fmt_heads(heads(proj))}\n\n"
         "## Commits this session\n\n" + ("\n".join(f"- {c}" for c in commits) or "- none") + "\n\n"
         "## .work files changed this session\n\n" + ("\n".join(f"- .work/{c}" for c in changed) or "- none") + "\n\n"
-        "## git status --porcelain\n\n```\n" + status + "\n```\n")
+        "## git status of both repos (project-relative paths)\n\n```\n" + status + "\n```\n")
     return out
 
 
@@ -268,7 +299,34 @@ def stop(inp, proj):
               "If you are blocked by an error you cannot resolve, run /handoff with outcome `error`."})
 
 
+WORKFLOW_BRANCH = re.compile(r"(^|[\s:/+])(work/[\w./-]+|workflow-migration)\b")
+
+
+def push_guard(inp, proj):
+    """Deny a `git push` that could publish workflow state: a workflow branch (work/*, workflow-migration),
+    --all or --mirror, anything run in .work/, or a plain push while the project repo is on a workflow branch."""
+    cmd = str((inp.get("tool_input") or {}).get("command") or "")
+    if not re.search(r"\bgit\b[^;&|\n]*\bpush\b", cmd):
+        return False
+    branch = git(proj, "rev-parse", "--abbrev-ref", "HEAD") or ""
+    why = None
+    if WORKFLOW_BRANCH.search(cmd):
+        why = "names a workflow branch (work/*, workflow-migration); those stay local"
+    elif re.search(r"--(all|mirror)\b", cmd):
+        why = "--all or --mirror would publish local workflow branches"
+    elif re.search(r"(^|[\s/])\.work\b", cmd):
+        why = "the .work repo is local only and is never pushed"
+    elif branch.startswith("work/") or branch == "workflow-migration":
+        why = f"the project repo is on the workflow branch {branch}, which stays local"
+    if why:
+        emit({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+              "permissionDecisionReason": f"Push guard: {why}. Blocked: {cmd[:200]}"}})
+    return bool(why)
+
+
 def pre_tool_use(inp, proj):
+    if inp.get("tool_name") == "Bash" and push_guard(inp, proj):
+        return
     role = str(inp.get("agent_type") or "")
     role = role[:-len("-mythos")] if role.endswith("-mythos") else role
     if inp.get("tool_name") not in WRITE_TOOLS or (role not in REVIEWERS and role not in SCOPED_WRITERS):
@@ -375,7 +433,6 @@ def post_agent(inp, proj):
         except OSError:
             pass
     if isinstance(tokens, (int, float)) and tokens > 0:
-        sys.path.insert(0, str(DOTCLAUDE / "scripts"))
         import budgets
         budgets.log(proj, stage_type, brief, role, int(tokens), inp.get("session_id", "-"))
     st = load_status(inp)

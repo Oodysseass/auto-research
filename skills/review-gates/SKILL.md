@@ -101,7 +101,8 @@ Effect of the governing ruling:
 ## Verified claims
 
 A claim becomes `verified` only when G1 and G2 have converged, and G3 where required, all at one commit with no edits in between.
-The orchestrator then writes `verified_by` in `claims.md`, one item per gate reviewer: `<gate>:<reviewer>:<model>@<commit>`.
+The orchestrator then writes `verified_by` in `claims.md`, one item per gate reviewer: `<gate>:<reviewer>:<model>@<commit>`,
+with `<commit>` = `<project>+<.work>` from `repos.py rev` (the project repo and the `.work` repo).
 A claim that converged at an earlier commit, then was edited, is `checked` until the gates converge again.
 After every edit, dispatch `regression-checker` and reset the claims it lists from `verified` to `checked`.
 An accepted counterexample sets `refuted` with `refuted_by` pointing to the issue ID. Refuted claims are never deleted.

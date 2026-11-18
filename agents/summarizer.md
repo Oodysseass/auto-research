@@ -24,7 +24,8 @@ Before every approval the orchestrator asks for (blocking events in `approvals.m
 Your prompt names: the stage, the packet path `.work/packets/<stage>.md`, the briefs of the stage, and the commit of the last approval
 (from the `approvals.md` Log, or the first commit if there is none).
 - The briefs, their `## Result` sections and `## Review log` tables.
-- `git log --oneline <last approval commit>..HEAD` and `git diff --stat <last approval commit>..HEAD`.
+- `python3 ~/dotclaude/scripts/repos.py log <last approval commit>` and `python3 ~/dotclaude/scripts/repos.py diff <last approval commit> --stat`:
+  both repos (the project repo and `.work/`), from a commit `<project>+<.work>`.
 - Every issue report, response and ruling in `.work/issues/` for the stage's artifact slugs.
 - `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug>` for each slug.
 - `.work/claims.md`, `.work/decisions/` (`python3 ~/dotclaude/scripts/decisions.py list`), `.work/contract.md`, `.work/approvals.md`, the playbook stage.

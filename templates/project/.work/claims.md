@@ -22,7 +22,8 @@ The regression-checker lists affected claims after every edit. The orchestrator 
 ## Entry format
 
 Keys are fixed. Lists are comma-separated. `none` for empty.
-`verified_by` is a semicolon-separated list of `<gate>:<reviewer>:<model>@<commit>`.
+`verified_by` is a semicolon-separated list of `<gate>:<reviewer>:<model>@<commit>`, where `<commit>` is `<project>+<.work>`
+(`repos.py rev`): the claim's text lives in the project repo, its registry entry in the `.work` repo.
 `refuted_by` is `none` unless status is `refuted`, and then it is required.
 `provisional_on` lists D-IDs, `none` unless status is `provisional`. `base_status` is the status the claim returns to.
 

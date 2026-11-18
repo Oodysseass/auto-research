@@ -49,7 +49,7 @@ and `k` is 1 for `arbiter`, 2 for `arbiter-mythos`. Names come from your prompt.
 
 ## Output
 
-JSON per `~/dotclaude/schemas/arbiter-ruling.schema.json`: `arbiter` (always `arbiter`), `model`, `commit` (`git rev-parse --short HEAD`), `artifact`, `issue_id`,
+JSON per `~/dotclaude/schemas/arbiter-ruling.schema.json`: `arbiter` (always `arbiter`), `model`, `commit` (`python3 ~/dotclaude/scripts/repos.py rev`), `artifact`, `issue_id`,
 `ruling`, `reviewer_case`, `producer_case`, `reasoning`, `required_change` (string only for `reviewer_right`, else null),
 `human_question` (string only for `needs_human`, else null).
 Validate: `python3 ~/dotclaude/scripts/validate_issue_json.py ~/dotclaude/schemas/arbiter-ruling.schema.json <file>`.

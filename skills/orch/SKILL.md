@@ -18,6 +18,19 @@ and everything you decide goes back to it. **One playbook stage per session.**
 - **end the session to ask the human something.** You ask inside the session (below) and continue.
 - ask the human about tokens, budgets, model tiers, effort, review round counts or file formats. You decide those and log them.
 
+## Two repos
+
+The project repo holds the paper and code and is shared with the human's coauthors. `.work/` is its own, local git repo.
+Workflow files never enter the project repo: `.git/info/exclude` keeps out `.work/`, `CLAUDE.md`, `.claude/`, `resources/` and `output/`.
+- Commit paper and code changes in the project repo, on the human's current branch, with messages free of workflow terms
+  (`commit-style`), only through `python3 ~/dotclaude/scripts/repos.py commit -m "<message>" [paths]`. It stages only files
+  under the project directory and commits only them. Never `git add -A`, `git add .` at the repo root or `git commit -a`
+  in the project repo: the project may be a subdirectory of a repo shared with coauthors' folders and sibling projects.
+  Commit `.work/` changes in the `.work` repo (`git -C .work add -A && git -C .work commit -m ...`).
+- Never `git add -f` an excluded path. Never push the `.work` repo or a `work/*` branch.
+- "The commit" in any file (approvals Log, `verified_by`, review log rows, issue reports) is `python3 ~/dotclaude/scripts/repos.py rev`,
+  `<project>+<.work>`. Diffs and logs since such a commit: `repos.py diff <rev>`, `repos.py log <rev>`.
+
 ## Asking the human
 
 Questions are about research content, scope and direction only. Every question has a class from the Class table of `approvals.md`.
@@ -56,6 +69,28 @@ Before asking for any approval (a blocking event in `approvals.md`, or a stage-e
 3. On approval: Log line in `approvals.md` with the commit, the card accepted. On refusal: the human's reason goes into the card
    and `decisions.md`; plan the rework as briefs of the same stage.
 
+## New inputs in resources/
+
+`resources/` is an append-only drop folder for inputs. `.work/resources.manifest` lists every file seen, by `resources.py`.
+At every session start (procedure step 3):
+1. `python3 ~/dotclaude/scripts/resources.py scan --warn`.
+2. `WARNING edited` or `WARNING deleted` lines: show each to the human in chat, once (`--warn` records it, so the next scan is
+   silent). Keep the old entry. Re-extract nothing unless the human asks; if they do, act on it, then
+   `resources.py refresh <path> --reason "<why>"`.
+3. Each `new:` file: read it in full. Write a one-line summary. Check whether it bears on the contract: the question and scope,
+   the approach in the project brief, the deliverables (R-IDs), the model (A-IDs), the Position rows (P-IDs), the
+   "Not interested in" rows (N-IDs), and the claims (C-IDs).
+   - It does not: `resources.py record <path> --summary "<line>"`. It is logged and listed in the checkpoint digest.
+   - It does: `resources.py raise <path> --summary "<line>" --affects <IDs> --reason "<line>"`, with `--scope-change` if it
+     changes scope and `--sow-version` if it is a new version of the SoW. Name every affected R-, N-, P-, A- and C-ID.
+     The card is blocking with either flag (asked with the other open cards, procedure step 4), checkpoint otherwise (`decisions.py provisional D<n>`).
+     Answers: A, update the contract: a dated addendum in `resources/BRIEF.md` (then `resources.py refresh resources/BRIEF.md
+     --reason D<n>`), the contract change and an approvals Log line, and requeued briefs for the affected items.
+     B, ignore: nothing more. C, stop: `/handoff error "stopped on new input <path> (D<n>)"`.
+4. Commit the manifest and any cards in the `.work` repo ("record new inputs").
+A file a producer writes into `resources/` (literature notes): `resources.py record <path> --summary "<line>" --produced` when
+you commit that producer's output, so it is never reported as new.
+
 ## Session end
 
 End the session only through `/handoff`, with one outcome:
@@ -71,20 +106,25 @@ context; every turn re-reads the whole context, so cost per turn grows with it; 
 ## Procedure
 
 1. Check that `.work/state.md` exists. If not, stop: the project needs `/intake`.
+   Then `python3 ~/dotclaude/scripts/repos.py check`. On exit 1 (`.work/` not a repo, a missing exclude line, or a workflow file
+   tracked by the project repo): `repos.py init` fixes the first two. A tracked workflow file is a blocking card (untrack it with
+   `git rm --cached`, message shown first, or stop); never untrack anything without the answer.
 2. Read, in order: `.work/state.md`; the latest file in `.work/handoffs/` (not `_template.md`; fold in any `*-auto-*.md` snapshot);
    `.work/contract.md`; `.work/approvals.md`; `resources/BRIEF.md`; the playbook file `~/dotclaude/skills/intake/playbooks/<playbook>.md`.
-3. Load the `model-routing`, `review-gates` and `commit-style` skills.
+3. Load the `model-routing`, `review-gates` and `commit-style` skills. Check `resources/` against the manifest (above).
 4. Pending decisions: `decisions.py list`. Ask every `open` card now (blocking first). Requeued briefs in `state.md` run first.
 5. Open issues: for each artifact with reports in `.work/issues/`, run
    `python3 ~/dotclaude/scripts/review_status.py .work/issues <slug>` and keep every artifact whose status is not `converged`.
 6. Plan the stage named in `state.md`. If every brief of that stage is `done`, advance `state.md` to the next stage and run that one.
-   Check out or create branch `work/<stage-id>-<slug>`.
+   Work on the project repo's current branch; record it in `state.md`. Create a branch only when the work must stay apart from
+   it, named `work/<stage-id>-<slug>`, local only.
 7. Work loop, for each brief of the stage:
    1. Write the brief from `.work/briefs/_template.md`, every field filled (artifact slug, stage type, critical, main theorem, gates
       from the playbook). Trace each acceptance criterion to R-IDs or C-IDs. Tier per routing.md. Budget: `budgets.py get <stage type>`.
       Log non-default tiers in `decisions.md` (`class: logged`). Commit.
    2. Dispatch the producer with the Agent tool. Prompt: the brief path, and nothing else the files do not hold.
       The PostToolUse hook logs usage to `.work/usage.tsv`; never write that file yourself.
+      Commit its output: paper and code in the project repo, `.work/` files in the `.work` repo.
    3. Register proposed claims in `claims.md` as `draft`. A claim that depends on a provisional card is set by `decisions.py`, not by hand. Commit.
    4. Run the gates in order, per the review-gates skill, with the write guard around every reviewer dispatch.
       Add a Review log row after every round, with `review_status.py .work/issues <slug> --hashes`.
@@ -101,5 +141,6 @@ context; every turn re-reads the whole context, so cost per turn grows with it; 
    which includes a checkpoint-class approval card; then a blocking approval card, if any. Then `/handoff stage-done`.
    Before any handoff, update `state.md`.
 
-Commits: follow the `commit-style` skill. Messages say what changed in the project ("add proof of lemma 2",
-"review model, round 2"), never which agent, reviewer, model or tool produced it.
+Commits: follow the `commit-style` skill, in the repo that holds the change (Two repos, above). Messages say what changed
+("add proof of lemma 2" in the project repo, "review model, round 2" in the `.work` repo), never which agent, reviewer, model
+or tool produced it. Project repo messages carry no workflow terms.

@@ -1,6 +1,7 @@
 # Issues
 
-One JSON file per review. Schemas: `~/dotclaude/schemas/issue-report.schema.json` and `issue-response.schema.json`.
+One JSON file per review. `commit` in every file is `<project>+<.work>`, the HEADs of the project repo and the `.work` repo
+(`python3 ~/dotclaude/scripts/repos.py rev`). Schemas: `~/dotclaude/schemas/issue-report.schema.json` and `issue-response.schema.json`.
 
 ## File names
 
@@ -15,7 +16,7 @@ One JSON file per review. Schemas: `~/dotclaude/schemas/issue-report.schema.json
   "reviewer": "proof-checker",
   "model": "claude-opus-5-5",
   "artifact": "paper/04analysis.tex#lem.safety",
-  "commit": "abc1234",
+  "commit": "abc1234+9f8e7d6",
   "issues": [
     {
       "id": "G2/proof-checker/1",
@@ -54,7 +55,7 @@ A duplicate never points to another duplicate.
 ```json
 {
   "producer": "prover",
-  "commit": "def5678",
+  "commit": "def5678+1a2b3c4",
   "responses": [
     { "issue_id": "G2/proof-checker/1", "status": "fixed", "justification": "Added the genesis case at line 124." }
   ]

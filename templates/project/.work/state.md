@@ -6,7 +6,8 @@ Updated by the orchestrator at the end of every session (`/handoff`). Read first
 - playbook: <name>
 - stage: <stage number and name from the playbook>
 - active brief: <briefs/<id>.md | none>
-- git branch: <branch>
+- project branch: <the project repo's current branch>
+- revs at last handoff: <project>+<.work> (`repos.py rev`)
 - last handoff: <handoffs/<timestamp>.md | none>
 
 ## Next actions

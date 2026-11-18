@@ -1,13 +1,17 @@
 # Pilot: steps you run yourself
 
 Guide for the throwaway project `~/dotclaude/pilot/`. You run every session. Claude does not.
-This guide lives outside the pilot repo on purpose: no file in `pilot/`, and nothing in its git history, may describe the deadlock test.
+This guide lives outside the pilot repo on purpose: no file in `pilot/`, and nothing in the git history of either of its repos,
+may describe the deadlock test.
 Goal: Lemma 1 and Lemma 2 of `resources/notes.md` each reach a final status (`verified` or `refuted`), with one Codex review
 and one deadlock settled by the arbiters. Second goal: test the interaction layer: questions come as dialogs inside the session,
 sessions chain by themselves, and you are never asked a technical question.
 
 The first run (stopped in S4) is archived in `old-run/`: its `.work/`, the paper draft, its CLAUDE.md, the brief with
-its intake addendum, and its git log. The new `pilot/` starts again from the same `resources/` (one commit, "add brief and notes").
+its intake addendum, and its git log. Both earlier runs used one repo. This run tests the two-repo layout: `pilot/` is the
+project repo (paper only, never a workflow file), and `pilot/.work/` is its own repo. `resources/` is excluded from the project
+repo and listed in `.work/resources.manifest`. `setup.sh` creates `pilot/` from `pilot-guide/resources/` (the original brief and
+notes) with an empty project repo: no commit until the first paper commit.
 
 Blindness: this file names the rebuttal the producer must repeat. Reviewers must never see it.
 `check.sh` scans the pilot working tree and its git history for any mention of this guide or the test, and for the planted
@@ -19,8 +23,13 @@ sentence anywhere except `paper/` and `.work/issues/`. If it finds one, the dead
 ~/dotclaude/scripts/run_tests.sh -q      # all tests pass
 codex login status                       # "Logged in using ChatGPT"
 which rw                                 # ~/dotclaude/bin/rw
-cd ~/dotclaude/pilot && git log --oneline   # one commit: "add brief and notes"
+ls ~/dotclaude/pilot                      # must not exist: archive the previous run first (below)
+~/dotclaude/pilot-guide/setup.sh          # creates pilot/: resources/, an empty project repo, the exclude lines
+cd ~/dotclaude/pilot && git status --porcelain --untracked-files=all   # prints nothing: resources/ is excluded
 ```
+
+Archiving the previous run (one-repo layout): copy what you want to keep into `old-run-2/` the way `old-run/` was made
+(`.work/`, `paper/`, `CLAUDE.md`, the brief, `git log --stat > git-log.txt`), then remove `pilot/`.
 
 - macOS notifications: the first one may ask for permission (System Settings, Notifications, Script Editor). Allow it.
 - The status line at the bottom of the session shows the model, the context in use (`ctx 12%`) and, in a project, the stage.
@@ -75,7 +84,10 @@ Check (`check.sh 1`):
 - `.work/contract.md`: every R-ID points to a line of `resources/BRIEF.md`; `## G1 checks` has P-rows from "Position" and N-rows from
   "Not interested in"; Lemma 1 marked main.
 - `.work/approvals.md`: the Class table at its defaults; Log has the contract approval with a commit. `.work/decisions/D1.md` is `accepted`.
-- `.work/state.md`: stage S4. Branch `work/intake`. Commit messages lowercase, no tool names (the check prints nothing).
+- `.work/state.md`: stage S4. No branch created. The contract commits are in the `.work` repo; the project repo has no commit.
+- repos check: both repos clean, `workflow files tracked by the project repo: none`, excludes ok. Nothing in the project repo's
+  history. `resources.manifest` lists `BRIEF.md` (after its addendum) and `notes.md`; the scan prints 0 new, 0 edited, 0 deleted.
+- commit messages lowercase, no tool names (the check prints nothing).
 - the session never ended to ask you anything.
 
 ## 3. Sessions 2 and later: one `rw`, many sessions
@@ -99,8 +111,10 @@ a session yourself. On the subscription limit it pauses, notifies you, prints th
 | S11 Full review | packet S11, checkpoint, blocking approval of the final deliverable | approve only if both lemmas have a final status | every gate converged at one commit; `verified_by` lists every gate reviewer |
 
 After every stop of `rw`, from `check.sh`:
-- git: clean tree; commit messages describe content ("add model and model section", "review model, round 2"), lowercase, no tool,
-  agent, reviewer or model names, no trailers (the commit-message section prints nothing).
+- git: both repos clean. Project repo: only paper commits ("add model section", "add proof of lemma 1"), on the branch you were on,
+  no workflow terms; `.work` repo: workflow commits ("review model, round 2", "approve model"). Lowercase, no tool, agent,
+  reviewer or model names, no trailers (the commit-message section prints nothing). No workflow file in the project repo's
+  history, no workflow branch on a remote, no remote on the `.work` repo.
 - `state.md` and a new handoff for every session; `.work/.rw/end.json` shows the last outcome.
 - `review_status.py` per artifact matches what the orchestrator did next.
 - every issue file validates; producer responses exist for every `revise` round.
@@ -115,6 +129,18 @@ a dialog without a card; a technical question; a packet that hides an open issue
 
 If a lemma reaches `refuted` before S8, S8 proves only the other one. Both lemmas are final when one is `refuted` with `refuted_by`
 and the other `verified` with `verified_by`, or both `verified`, or both `refuted`. Stop the pilot there.
+
+### Resources test (optional, between two `rw` runs)
+
+With `rw` stopped, drop new files into `resources/` and check what the next session does at its start:
+- an unrelated file (e.g. `resources/reading-list.md` with two unrelated titles): recorded, no dialog; it appears in the
+  checkpoint digest as "new input recorded".
+- a file that changes scope (e.g. `resources/notes-v2.md` asking for a probabilistic version of Lemma 1, which "Not interested in"
+  excludes): a blocking dialog at session start, with options update the contract, ignore, stop, naming the N-row, the R-IDs and
+  the claim (Lemma 1) it affects.
+  Answer "Ignore this file".
+- an edit to `notes.md` (add a blank line): one warning in chat at session start, none in the next session; nothing re-extracted.
+`/wstatus` before the session lists the new files as unprocessed.
 
 ## 4. Forcing the deadlock (S8)
 
@@ -155,6 +181,7 @@ Check after S8:
 ## 5. What to bring back
 
 - `~/dotclaude/pilot-guide/logs/session-*.txt`.
+- any workflow file or workflow term that reached the project repo (repos check, history and commit-message sections).
 - the session log below, and every finding of section 3 with its session number.
 - for each dialog: was the recommendation right, and was the one-line reason enough to decide without opening a file?
 

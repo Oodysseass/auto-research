@@ -17,10 +17,20 @@ def proj(tmp_path):
     (p / ".work" / "briefs").mkdir(parents=True)
     (p / ".work" / "state.md").write_text("# State\n\n- stage: 2 (S4 Model)\n")
     (p / ".work" / "briefs" / "S4-model.md").write_text("# Brief S4-model\n\n- stage type: model\n")
+    (p / "paper").mkdir()
+    (p / "paper" / "main.tex").write_text("x\n")
     subprocess.run(["git", "init", "-q", str(p)], check=True)
-    subprocess.run(["git", "-C", str(p), "-c", "user.name=t", "-c", "user.email=t@t", "add", "."], check=True)
-    subprocess.run(["git", "-C", str(p), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init"], check=True)
+    subprocess.run([sys.executable, str(ROOT / "scripts" / "repos.py"), "--root", str(p), "init"], check=True,
+                   capture_output=True)
+    for repo in (p, p / ".work"):
+        commit(repo, "init")
     return p
+
+
+def commit(repo, msg):
+    g = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(g + ["add", "-A"], check=True)
+    subprocess.run(g + ["commit", "-qm", msg], check=True)
 
 
 @pytest.fixture
@@ -186,3 +196,44 @@ def test_summarizer_write_scope(env, proj):
     out = guard(env, proj, "proof-checker", ".work/packets/S4.md")
     assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
     assert guard(env, proj, "proof-checker-mythos", ".work/issues/new.json") == ""
+
+
+def test_stop_sees_commits_in_both_repos(tmp_path, env, proj):
+    start(env)
+    (proj / "paper" / "main.tex").write_text("y\n")
+    commit(proj, "add proof of lemma 1")
+    out = hook(env, "stop", {"session_id": "s1"})
+    assert out["decision"] == "block" and "1 commit(s)" in out["reason"]
+    hook(env, "session-start", {"session_id": "s2", "source": "startup"})
+    (proj / ".work" / "briefs" / "S4-model.md").write_text("changed\n")
+    commit(proj / ".work", "plan model")
+    out = hook(env, "stop", {"session_id": "s2"})
+    assert out["decision"] == "block" and "1 commit(s)" in out["reason"]
+    (proj / ".work" / "state.md").write_text("# State\n\n- stage: 3\n")
+    commit(proj / ".work", "update project state after model")
+    assert hook(env, "stop", {"session_id": "s2"}) == ""
+
+
+def test_precompact_snapshot_lists_both_repos(tmp_path, env, proj):
+    start(env)
+    (proj / ".work" / "claims.md").write_text("changed\n")
+    (proj / "paper" / "main.tex").write_text("z\n")
+    out = hook(env, "pre-compact", {"session_id": "s1", "trigger": "auto"})
+    assert "snapshot handoff" in out
+    snap = next((proj / ".work" / "handoffs").glob("*-auto-precompact.md")).read_text()
+    assert " M paper/main.tex" in snap and "?? .work/claims.md" in snap
+
+
+def push(env, proj, cmd):
+    return hook(env, "pre-tool-use", {"tool_name": "Bash", "cwd": str(proj), "tool_input": {"command": cmd}})
+
+
+def test_push_guard(env, proj):
+    for cmd in ("git push origin work/S4-model", "git push --all", "git -C .work push", "cd .work && git push",
+                "git push -u origin workflow-migration", "git push origin HEAD:refs/heads/work/x"):
+        out = push(env, proj, cmd)
+        assert out["hookSpecificOutput"]["permissionDecision"] == "deny", cmd
+    assert push(env, proj, "git push origin main") == ""
+    assert push(env, proj, "git status") == ""
+    subprocess.run(["git", "-C", str(proj), "checkout", "-qb", "work/S8-proofs"], check=True)
+    assert push(env, proj, "git push")["hookSpecificOutput"]["permissionDecision"] == "deny"

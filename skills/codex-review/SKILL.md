@@ -5,7 +5,7 @@ description: Gate G3 cross-model review with the OpenAI Codex CLI (ChatGPT subsc
 
 # Codex review (G3)
 
-Run from the project root. The orchestrator runs it; agents never do.
+Run from the project root (the directory that contains `.work/`, possibly a subdirectory of the project repo). The orchestrator runs it; agents never do.
 
 ```
 ${CLAUDE_SKILL_DIR}/codex_review.sh --artifact <path[#label]> --slug <slug> --round <n> --brief <.work/briefs/<id>.md> \
@@ -20,14 +20,15 @@ Codex lists for the model in `~/.codex/models_cache.json`. Routing per routing.m
 
 1. Refuses to run unless the contract allows Codex: `ai_tools_allowed` in `.work/contract.md` must list `codex`.
    A contract without that line uses the default (`claude, codex`).
-2. Refuses to run unless the tree is clean (write guard, before dispatch) and Codex is signed in with ChatGPT.
+2. Refuses to run unless both repos, the project repo and the `.work` repo, are clean (`repos.py guard-begin`, write guard
+   before dispatch) and Codex is signed in with ChatGPT.
 3. Unsets `OPENAI_API_KEY` and `CODEX_API_KEY` in its subprocess. Subscription only.
 4. Fills [prompt.md](prompt.md) and runs `codex exec` in the project root with `--sandbox read-only`, `--ephemeral`,
    `--output-schema` ([codex-output.schema.json](codex-output.schema.json)) and `--output-last-message`.
-5. Builds the full report (gate `G3`, reviewer `codex`, model, artifact, commit) and validates it against
+5. Builds the full report (gate `G3`, reviewer `codex`, model, artifact, commit `<project>+<.work>` from `repos.py rev`) and validates it against
    `~/dotclaude/schemas/issue-report.schema.json`, plus: IDs `G3/codex/<n>`, no `duplicate_of`, verdict consistent with severities.
    On invalid output it re-asks once with the errors. A second failure exits 4 and writes nothing.
-6. Checks `git status` before writing the report. If Codex changed anything, it reverts per
+6. Checks both repos (`repos.py guard-check`) before writing the report. If Codex changed anything in either, it reverts per
    [write-guard.md](../review-gates/write-guard.md), prints a loud error and exits 3. The review is discarded.
 7. Writes `.work/issues/<slug>.G3.codex.r<round>.json`. It never overwrites an existing report.
 
@@ -35,7 +36,7 @@ Exit codes: 0 written; 2 refused (contract, dirty tree, auth, arguments); 3 Code
 
 ## After the script
 
-- Exit 0: commit the report (message per the `commit-style` skill: "review <artifact>, round <n>"), then treat it like any other review (review-gates skill). Codex IDs are stable across rounds:
+- Exit 0: commit the report in the `.work` repo (message per the `commit-style` skill: "review <artifact>, round <n>"), then treat it like any other review (review-gates skill). Codex IDs are stable across rounds:
   the script passes the previous round's report to Codex.
 - Exit 3: log "reviewer write violation" in `decisions.md` (write-guard step 4.5). A second violation follows write-guard step 4.6; it is not arbitrated.
 - Exit 4 or 5: log it (`class: logged`) and retry once. A second failure: `/handoff error` with the exit code. Do not substitute a Claude reviewer for G3.

@@ -13,3 +13,4 @@
 11. One idea per sentence. Shortest sentence first in a paragraph.
 12. Do not change the model or an assumption silently. Every step uses listed assumptions (A-IDs) only.
 13. Commit messages follow the `commit-style` skill. Name what changed, never the agent, reviewer or tool. No trailers.
+14. Two repos: paper and code commit in the project repo, without workflow terms, only via `repos.py commit` (never `git add -A` or `git commit -a`); `.work/` commits in the `.work` repo. Never push `.work` or a `work/*` branch.

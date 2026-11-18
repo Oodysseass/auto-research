@@ -21,6 +21,7 @@ system (tokens, budgets, model tiers, effort levels, review round counts, file f
 |---|---|
 | Contract and playbook | blocking |
 | Any change to the contract or the scope after approval | blocking |
+| New input in `resources/` that changes scope or is a new SoW version | blocking |
 | Main theorem statements, before proving starts | blocking |
 | Each milestone or final deliverable | blocking |
 | Deleting or overwriting existing files | blocking |
@@ -29,15 +30,18 @@ system (tokens, budgets, model tiers, effort levels, review round counts, file f
 | Definitions and property statements | checkpoint |
 | Lemma statements (not main theorems) | checkpoint |
 | Design choices | checkpoint |
+| New input in `resources/` that bears on the contract otherwise | checkpoint |
 | Deadlock unresolved by the arbiters, other claims (the arbiter's recommended answer is taken provisionally) | checkpoint |
 | A stalled review loop or a round limit, with a research question to settle | checkpoint |
 | Routing, model tiers, Mythos escalation | logged |
 | Retries and reruns | logged |
 | Budget extensions | logged |
 | Minor fixes | logged |
+| New input in `resources/` that does not bear on the contract (recorded) | logged |
 
 ## Log
 
-Append-only. One line per approval granted or refused, with the commit it applies to. The summarizer diffs from this commit.
+Append-only. One line per approval granted or refused, with the commit it applies to: `<project>+<.work>` from
+`python3 ~/dotclaude/scripts/repos.py rev`. The summarizer diffs from this commit (`repos.py diff`).
 
 - <YYYY-MM-DD> | <event> | <artifact or file> | <approved | refused> | <commit> | <D-ID or note>
