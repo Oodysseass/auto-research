@@ -12,3 +12,4 @@
 10. No "clearly", "obviously", "it is easy to see", "straightforward", "trivially".
 11. One idea per sentence. Shortest sentence first in a paragraph.
 12. Do not change the model or an assumption silently. Every step uses listed assumptions (A-IDs) only.
+13. Commit messages follow the `commit-style` skill. Name what changed, never the agent, reviewer or tool. No trailers.

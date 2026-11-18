@@ -49,3 +49,4 @@ Default to Rust for systems work and Python for scripts unless told otherwise.
 - Be direct. Do not pad responses.
 - Do not invent context. Ask if something is unclear.
 - Prefer short responses when the task is short.
+- Commits follow the `commit-style` skill: lowercase imperative subject, no trailer, no AI or tool references.
