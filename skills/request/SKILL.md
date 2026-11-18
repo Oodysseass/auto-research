@@ -28,6 +28,8 @@ Workspace files the prompt names inside the project are references, not attachme
 
 ## 2. Assess
 
+0. New inputs: if the session start listed unprocessed files in `resources/`, process them first, as in the orch skill
+   "New inputs in resources/" (once per session). A file that changes scope is asked before this request.
 1. Read `.work/contract.md`, `model.md`, `glossary.md`, `claims.md`, `state.md`, `approvals.md` (Class table), and the
    artifacts the request names. `python3 $R context` shows the stage in progress and other open or deferred requests.
 2. Conflict with a stage in progress (`stage in progress: true` and the request touches a file, claim or assumption of
@@ -35,7 +37,7 @@ Workspace files the prompt names inside the project are references, not attachme
    (Recommended)" or "After the stage". After: `python3 $R close RQ<n> --status deferred --summary "<why>"`, add it to
    `state.md` "Next actions" (`RQ<n> deferred until <stage> is done`), commit, and stop (step 5). The next `/orch`
    session runs deferred requests at its stage end. No conflict: say nothing about it.
-3. Impact. Name every R-, N-, P-, A- and C-ID the request touches, and the deliverables.
+3. Impact. Name every R-, N-, P-, A- and C-ID the request touches, and the deliverables (DL-IDs).
    - Changes the scope or a deliverable (adds, drops or reshapes a requirement or deliverable, its format or due date,
      or crosses an N-row): blocking card. `python3 $R raise RQ<n> --affects <IDs> --question "<one sentence?>" --reason
      "<line>" --scope-change | --deliverable-change`, commit, ask it now (`decisions.py compress D<n>`), record the
@@ -49,14 +51,14 @@ Workspace files the prompt names inside the project are references, not attachme
      as `answered`, go to step 4 without gates.
 4. Classify what the change touches. `prose`: wording, structure, order, headings, exposition, remarks with no claim.
    `technical`: a definition, statement, proof, algorithm, the model, an assumption, a finding or an attack.
-   Critical: a main result (main theorem in the contract or claims) or a deliverable. Mode: `default`, or what record
-   detected ("quick", "full review"); a mode the human states overrides the default.
+   Critical: a main result (main theorem in the contract or claims), a design, or a final deliverable (milestone or final). Mode: `default`, or what record
+   detected from a `quick:` or `full:` prefix; a mode the human states otherwise overrides the default.
 
 ## 3. Execute
 
 1. Gates: `python3 $R gates --kind <prose|technical> [--tex] [--critical] [--mode <mode>]`. It prints the brief's
    `- gates:` and `- critical:` lines. prose: G0, G1, G4. technical: G0 to G2 and G4, G3 if critical. quick: G0, G1.
-   full review: G0 to G4. G0 only when a `.tex` file changes. G5 only through a card from step 2.
+   full: G0 to G4. G0 only when a `.tex` file changes. G5 only through a card from step 2.
 2. One brief per artifact, from `.work/briefs/_template.md`, id `RQ<n>-<slug>`, `- stage: request RQ<n>`,
    `- request: RQ<n>`, gates and critical from step 1, acceptance criteria traced to the request (`BRIEF.md#RQ<n>`)
    and to R- or C-IDs. Tier per routing.md. Commit (`plan <change>`). `python3 $R set RQ<n> briefs=<id> gates="<gates>"`.
@@ -66,7 +68,7 @@ Workspace files the prompt names inside the project are references, not attachme
    holds it (paper and code: `repos.py commit`, a content message without workflow terms).
 4. Run the gates of the brief, in order, exactly as in the orch skill work loop (step 7.3 to 7.6): write guard,
    `review_status.py` after every round, act on its last line, arbiters, escalation cards. `regression-checker` after
-   every edit to a claim.
+   every edit to LaTeX, pseudocode, `model.md` or `glossary.md` (review-gates, "Verified claims").
 5. Claims: register new ones as `draft`; set statuses only as the gates earn them. Quick mode never raises a status.
    `python3 $R set RQ<n> claims=<C-IDs> decisions=<D-IDs>` as they arise.
 
@@ -75,6 +77,7 @@ Workspace files the prompt names inside the project are references, not attachme
 1. `claims.md` final statuses. `state.md`: `updated`, "Pending decisions", and under "Next actions" anything the
    request leaves open; the stage and playbook lines stay as they are. `decisions.md`: one entry
    `RQ<n> done: <title>` (`made by: human`, `class: logged`, `card: <D-IDs | none>`, reason: what was done).
+   Write `state.md` last: the Stop hook treats claims and project changes newer than `state.md` as unrecorded.
 2. `python3 $R close RQ<n> --status <done | answered | dropped> --summary "<one line>"`. It records the commits and
    changed files of both repos since `rev before`. Commit the `.work` repo: `update project state after <topic>`.
    The project repo is committed already (step 3.3); never commit workflow files there.

@@ -158,3 +158,12 @@ def test_normalize_exclude():
     assert n("CLAUDE.md") == "CLAUDE.md"
     assert n("# a/b") == "# a/b"
     assert n("  a/b  ") == "/a/b"
+
+
+def test_commit_refuses_with_tracked_workflow_file(proj):
+    (proj / "CLAUDE.md").write_text("notes\n")
+    git(proj, "add", "-f", "CLAUDE.md")
+    git(proj, "commit", "-qm", "add notes")
+    (proj / "paper" / "main.tex").write_text("edited\n")
+    r = run(proj, "commit", "-m", "revise intro")
+    assert r.returncode != 0 and "CLAUDE.md" in (r.stdout + r.stderr) and "untrack" in (r.stdout + r.stderr)

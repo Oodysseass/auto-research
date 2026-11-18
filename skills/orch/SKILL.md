@@ -53,9 +53,10 @@ Questions are about research content, scope and direction only. Every question h
 ## Checkpoints
 
 At the end of every stage, and before every blocking approval, if any card is `provisional`:
-1. `decisions.py checkpoint` prints the screen: pending provisional decisions, open questions, the digest of logged decisions,
-   and usage (information only). Show it in chat as it is.
-2. `decisions.py checkpoint --questions` prints the first dialog: "Accept all (Recommended)" or "Review individually". Ask it.
+1. `decisions.py checkpoint` prints the screen: pending provisional decisions, open questions and the digest of logged decisions.
+   Show it in chat as it is.
+2. `decisions.py checkpoint --questions` prints the first dialog: it names each provisional decision and the option taken, then "Accept all
+   (Recommended)" or "Review individually". Ask it.
 3. Accept all: `decisions.py accept` each card. Review individually: `compress` the provisional cards, ask in batches of 4,
    `accept --option` each answer. Reversals requeue work automatically (state.md "Requeued").
 4. `decisions.py checkpoint --close`. Commit.

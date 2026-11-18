@@ -58,7 +58,7 @@ Three classes (`.work/approvals.md`, Class table), at their defaults in this pil
 | logged | routing, Mythos use, retries, budget extensions, minor fixes | never asked; listed in the checkpoint digest |
 
 A checkpoint is one screen in chat: the provisional decisions with what was taken and the alternatives, open questions, the
-decisions the system took alone, and usage (information only). Then one dialog: "Accept all (Recommended)" or "Review individually".
+decisions the system took alone. Then one dialog that names each provisional decision: "Accept all (Recommended)" or "Review individually".
 "Review individually" asks one question per decision; choosing another option reverses it, sets the dependent claims to `draft`
 and requeues their briefs. Checkpoints come at the end of every stage and before every blocking approval.
 

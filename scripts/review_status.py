@@ -10,8 +10,8 @@ Gates and G2 reviewers come from the brief's `- gates:` field, e.g. `G0, G1, G2[
   review_status.py <issues-dir> --all [--json]
       Open issues of the whole directory: one line per artifact slug (counts as in the per-artifact report), one line
       per legacy file (`legacy*.json`, e.g. legacy-open.json from a migration), and a total `open issues:` line.
-      An issue counts unless a producer_right ruling closed it, it is a duplicate, or its optional `status` is
-      `closed`. A missing `status` means open.
+      An issue counts unless a producer_right ruling closed it, it is a duplicate, or (legacy files only) its
+      optional `status` is `closed`. A missing `status` means open. `status` in any other report is ignored.
 
   review_status.py <issues-dir> <artifact-slug> --hashes
       Prints the Review log `hashes` cell for the current content: each file in the brief's
@@ -42,7 +42,8 @@ a clean G3 round on the same content completes it. Exit 0, or 2 on usage errors.
 
 Two repos: the artifact files live in the project repo, model.md, glossary.md and claims.md in the .work repo (repos.py).
 Content is compared by the hashes above, which read both from disk. A report's `commit` is `<project>+<.work>`
-(repos.py rev). It is used only when a round has no hashes, and then both parts must match: an edit to claims.md
+(repos.py rev). A clean round without hashes never converges: the rerun must log them. The commit is used only
+to match a G3 round without hashes against another round, and then both parts must match: an edit to claims.md
 moves the .work part even when the project repo's HEAD is unchanged. For a project in a subdirectory of the project repo,
 the project part is the last commit that touched the subdirectory, so commits elsewhere in the repo never change it.
 """
@@ -277,8 +278,9 @@ class Ctx:
         return gov is not None and gov["ruling"] == "producer_right"
 
     def counted(self, rep):
-        """Issues of a report that count: not closed by a producer_right ruling."""
-        return [i for i in rep.get("issues", []) if issue_open(i) and not self.closed(i["id"])]
+        """Issues of a report that count: not closed by a producer_right ruling. A `status` field is ignored here:
+        it is honored only in legacy files, so a reviewer can never close its own issue."""
+        return [i for i in rep.get("issues", []) if not self.closed(i["id"])]
 
     def is_clean(self, rep):
         return not any(i["severity"] in BAD for i in self.counted(rep))
@@ -287,7 +289,8 @@ class Ctx:
         return self.hashes.get((gate, reviewer, rnd))
 
     def unedited(self, h):
-        """Content reviewed in a round is still the current content (unknown hashes count as unedited)."""
+        """Content reviewed in a round is still the current content. A clean round without hashes never converges
+        (stream_status); here unknown hashes count as unedited only for the stall checks."""
         if h is None:
             return True
         return same_content(h, {f: self.current.get(f, "missing") for f in h})
@@ -301,6 +304,10 @@ def stream_status(ctx, gate, reviewer):
     rep = rounds[last]
     h_last = ctx.round_hashes(gate, reviewer, last)
     clean = ctx.is_clean(rep)
+    if clean and h_last is None:
+        return {"status": "open", "action": "run",
+                "reason": f"clean round r{last} has no content hashes in the Review log, so its content cannot be "
+                          "confirmed; log hashes (--hashes) with every round and rerun"}
     valid = clean and ctx.unedited(h_last)
 
     # 1. Converged.

@@ -284,10 +284,11 @@ def test_checkpoint_screen_and_digest(tmp_path, capsys):
     assert "**D1**" in out and "taken: Extends chosen chain" in out and "C1, C2" in out
     assert "route C2 to prover-mythos" in out and "extend budget of S7-lemma" in out
     assert "old routing" not in out
-    assert "S5-defs: 120k" in out
+    assert "S5-defs" not in out and "Usage" not in out
     run(root, "checkpoint", "--questions")
     q = json.loads(capsys.readouterr().out)
     assert len(q) == 1 and q[0]["options"][0]["label"] == "Accept all (Recommended)"
+    assert "D1 (" in q[0]["question"] and "Extends chosen chain" in q[0]["question"] and "above" not in q[0]["question"]
     run(root, "accept", "D1")
     run(root, "checkpoint", "--close")
     capsys.readouterr()

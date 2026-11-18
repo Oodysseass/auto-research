@@ -147,12 +147,9 @@ def load_prompt(sid, transcript, text_file):
 
 
 def mode_of(text):
-    t = text.lower()
-    if re.search(r"\bfull[- ]review\b", t):
-        return "full"
-    if re.search(r"\bquick\b", t):
-        return "quick"
-    return "default"
+    """Gate depth from a `quick:` or `full:` prefix (case-insensitive). Words elsewhere in the prompt do not count."""
+    m = re.match(r"\s*(quick|full)\s*:", text, re.I)
+    return m.group(1).lower() if m else "default"
 
 
 def attached_paths(text, root):

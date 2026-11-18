@@ -112,14 +112,44 @@ def test_stop_ignores_marker_of_other_run(tmp_path, env, proj):
     assert out["decision"] == "block"
 
 
-def test_auto_files_are_not_unrecorded_work(tmp_path, env, proj):
+def test_bookkeeping_is_not_unrecorded_work(tmp_path, env, proj):
     start(env)
     (proj / ".work/usage.tsv").write_text("x\n")
     (proj / ".work/.rw").mkdir()
     (proj / ".work/.rw/end.json").write_text("{}")
+    (proj / ".work/requests.md").write_text("x\n")
+    (proj / ".work/decisions.md").write_text("x\n")
+    (proj / ".work" / "briefs" / "S4-model.md").write_text("changed\n")
+    commit(proj / ".work", "plan model")
     assert hook(env, "stop", {"session_id": "s1"}) == ""
     (proj / ".work/claims.md").write_text("x\n")
     assert hook(env, "stop", {"session_id": "s1"})["decision"] == "block"
+
+
+def test_uncommitted_edits_count_only_if_this_session_wrote_them(tmp_path, env, proj):
+    start(env)
+    (proj / "paper" / "main.tex").write_text("edited by the human\n")
+    (proj / "paper" / "notes.tex").write_text("new\n")
+    t = transcript(tmp_path, user("fix the intro"),
+                   {"type": "assistant", "message": {"role": "assistant", "content": [
+                       {"type": "tool_use", "name": "Write", "input": {"file_path": str(proj / "paper" / "notes.tex")}}]}})
+    out = hook(env, "stop", {"session_id": "s1", "transcript_path": t})
+    assert out["decision"] == "block" and "paper/notes.tex" in out["reason"] and "main.tex" not in out["reason"]
+    t2 = transcript(tmp_path, user("hello"))
+    assert hook(env, "stop", {"session_id": "s1", "transcript_path": t2}) == ""
+
+
+def test_work_after_recording_blocks_again(tmp_path, env, proj):
+    start(env)
+    (proj / "paper" / "main.tex").write_text("y\n")
+    commit(proj, "add proof of lemma 1")
+    time.sleep(1.1)
+    (proj / ".work" / "state.md").write_text("# State\n\n- stage: 3\n")
+    assert hook(env, "stop", {"session_id": "s1"}) == ""
+    time.sleep(1.1)
+    (proj / ".work/claims.md").write_text("C1 verified\n")
+    out = hook(env, "stop", {"session_id": "s1"})
+    assert out["decision"] == "block" and ".work/claims.md" in out["reason"]
 
 
 def status(env, sid, **cw):
@@ -198,17 +228,18 @@ def test_summarizer_write_scope(env, proj):
     assert guard(env, proj, "proof-checker-mythos", ".work/issues/new.json") == ""
 
 
-def test_stop_sees_commits_in_both_repos(tmp_path, env, proj):
+def test_stop_sees_project_commits_and_claims(tmp_path, env, proj):
     start(env)
     (proj / "paper" / "main.tex").write_text("y\n")
     commit(proj, "add proof of lemma 1")
     out = hook(env, "stop", {"session_id": "s1"})
     assert out["decision"] == "block" and "1 commit(s)" in out["reason"]
     hook(env, "session-start", {"session_id": "s2", "source": "startup"})
-    (proj / ".work" / "briefs" / "S4-model.md").write_text("changed\n")
-    commit(proj / ".work", "plan model")
+    (proj / ".work" / "claims.md").write_text("C1 draft\n")
+    commit(proj / ".work", "register lemma statements")
     out = hook(env, "stop", {"session_id": "s2"})
-    assert out["decision"] == "block" and "1 commit(s)" in out["reason"]
+    assert out["decision"] == "block" and ".work/claims.md" in out["reason"]
+    time.sleep(1.1)
     (proj / ".work" / "state.md").write_text("# State\n\n- stage: 3\n")
     commit(proj / ".work", "update project state after model")
     assert hook(env, "stop", {"session_id": "s2"}) == ""
@@ -237,3 +268,19 @@ def test_push_guard(env, proj):
     assert push(env, proj, "git status") == ""
     subprocess.run(["git", "-C", str(proj), "checkout", "-qb", "work/S8-proofs"], check=True)
     assert push(env, proj, "git push")["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def test_import_error_fails_open(tmp_path, env, proj):
+    broken = tmp_path / "broken"
+    (broken / "hooks").mkdir(parents=True)
+    (broken / "scripts").mkdir()
+    (broken / "hooks" / "rw_hooks.py").write_text(HOOK.read_text())
+    (broken / "scripts" / "repos.py").write_text("this is not python\n")
+    (broken / "scripts" / "request.py").write_text("")
+    e = {k: v for k, v in env.items() if k != "RW_HOOKS_DEBUG"}
+    r = subprocess.run([sys.executable, str(broken / "hooks" / "rw_hooks.py"), "stop"], input=json.dumps({"session_id": "s1"}),
+                       capture_output=True, text=True, env=e)
+    assert r.returncode == 0 and r.stdout == "" and "internal error ignored" in r.stderr
+    r = subprocess.run([sys.executable, str(broken / "hooks" / "rw_hooks.py"), "stop"], input="{}",
+                       capture_output=True, text=True, env=dict(e, CLAUDE_PROJECT_DIR=str(tmp_path / "nowork")))
+    assert r.returncode == 0 and r.stdout == "" and r.stderr == ""

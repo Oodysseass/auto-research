@@ -22,8 +22,8 @@ The SoW governs scope. The project brief governs approach. I resolve any conflic
 
 | ID | Requirement | Source | Deliverable |
 |---|---|---|---|
-| R1 | <one line> | <resources/sow.pdf, p. 3, Sec. 2.1> | D1 |
-| R2 | <one line> | <resources/BRIEF.md:14> | D1 |
+| R1 | <one line> | <resources/sow.pdf, p. 3, Sec. 2.1> | DL1 |
+| R2 | <one line> | <resources/BRIEF.md:14> | DL1 |
 
 ## Scope
 
@@ -45,9 +45,11 @@ Explicit checks for the conformance reviewer, on every artifact. Taken from the 
 
 ## Deliverables
 
+Deliverable IDs are `DL<n>`. `D<n>` always means a decision card.
+
 | ID | Deliverable | Covers | Milestone | Due |
 |---|---|---|---|---|
-| D1 | <report, paper section, proof, design doc> | R1, R2 | M1 | <YYYY-MM-DD> |
+| DL1 | <report, paper section, proof, design doc> | R1, R2 | M1 | <YYYY-MM-DD> |
 
 ## Approval
 

@@ -217,4 +217,4 @@ PY
   echo "codex_review: attempt $attempt produced invalid output:" >&2
   sed 's/^/  /' "$TMP/errors.$attempt" >&2
 done
-die 4 "invalid output twice. Nothing written. Escalate to the human."
+die 4 "invalid output twice. Nothing written. Log it and retry the script once; a second failure is /handoff error (codex-review skill)."

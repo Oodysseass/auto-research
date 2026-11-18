@@ -34,7 +34,7 @@ The workflow makes Claude Code a research partner with a team of specialist agen
 
 Prefixes `quick:` and `full:` override the default gate depth of a commitment.
 
-**What runs today (direct mode).** Every prompt typed in a plain session in a `.work/` project, unless it starts with `raw:` or `/`, is a request handled by the `request` skill. The hooks, the global `CLAUDE.md` and each project's `CLAUDE.md` ("Direct mode" section, installed by `scripts/project_update.py`) say so. The words "quick" and "full review" in a request select the gate depth (section 6). Conversation first (history entry 10) replaces this; it is not built.
+**What runs today (direct mode).** Every prompt typed in a plain session in a `.work/` project, unless it starts with `raw:` or `/`, is a request handled by the `request` skill. The hooks, the global `CLAUDE.md` and each project's `CLAUDE.md` ("Direct mode" section, installed by `scripts/project_update.py`) say so. The `quick:` and `full:` prefixes select the gate depth (section 6); words elsewhere in a prompt do not. Conversation first (history entry 10) replaces this; it is not built.
 
 **Quick probes** (*not built*): cheap checks during conversation (counterexample attempt, literature check, model-conformance check). Labeled "probe, unverified". They never change claim statuses and are kept only if captured.
 
@@ -48,7 +48,7 @@ Prefixes `quick:` and `full:` override the default gate depth of a commitment.
     BRIEF.md                    owner's intent (client or research template); requests appended under dated headings
   CLAUDE.md, .claude/           project instructions; never tracked by the project repo
   .work/                        its own git repo
-    contract.md                 R-IDs (requirements), D-IDs (deliverables), N-IDs (out of scope, from the brief's G1 check rows), P-rows (position), each pointing to BRIEF or SoW lines; approval
+    contract.md                 R-IDs (requirements), DL-IDs (deliverables; D-IDs are decision cards), N-IDs (out of scope, from the brief's G1 check rows), P-rows (position), each pointing to BRIEF or SoW lines; approval
     model.md                    assumptions A1, A2, ... with labels
     glossary.md                 terms, macros, notation for this project
     claims.md                   registry: status draft | provisional | checked | verified | refuted | legacy-unverified
@@ -68,8 +68,8 @@ Prefixes `quick:` and `full:` override the default gate depth of a commitment.
 ```
 
 - Excludes go in `.git/info/exclude` (never a committed `.gitignore`, which would reveal the workflow), prefixed with the project's subfolder path when the project is not the repo root. They cover `.work/`, `CLAUDE.md`, `.claude/`, `resources/` and build `output/`.
-- Inputs in `resources/` that the project repo already tracks may stay tracked if the owner chooses at intake. `CLAUDE.md`, `.claude/` and `resources/BRIEF.md` must not be tracked: `repos.py check` fails and `rw` refuses to start.
-- `resources/` is append-only for the owner. A new file is read and checked against the contract: unrelated files are recorded; files that bear on the contract produce a checkpoint card; files that change scope or are a new SoW produce a blocking card. The scan runs at the start of each orchestrator session. Edits or deletions are anomalies: one warning per new version of a file; edits to `BRIEF.md` also warn once when a request is recorded.
+- Inputs in `resources/` that the project repo already tracks may stay tracked if the owner chooses at intake. `CLAUDE.md`, `.claude/` and `resources/BRIEF.md` must not be tracked: intake untracks them or stops, `repos.py check` fails and `rw` refuses to start, and `project_update.py` refuses to write into a tracked `CLAUDE.md`.
+- `resources/` is append-only for the owner. A new file is read and checked against the contract: unrelated files are recorded; files that bear on the contract produce a checkpoint card; files that change scope or are a new SoW produce a blocking card. The scan runs at the start of each orchestrator session; in a plain session, SessionStart lists unprocessed files and they are handled before the next request. Edits or deletions are anomalies: one warning per new version of a file; edits to `BRIEF.md` also warn once when a request is recorded.
 - The workflow itself adds to `resources/`: request entries and addenda in `BRIEF.md`, request attachments in dated folders, producers' literature notes, and refreshed entries after an accepted change.
 
 ## 5. Agents
@@ -96,16 +96,16 @@ Dispatched only by the orchestrator (main session). Shared rules in the `agent-p
 | G4 | writing style | style-reviewer |
 | G5 | human | per `approvals.md` |
 
-- Gate depth for a commitment: prose or structure only runs G0, G1, G4; statements, proofs, model or findings run G0 to G4, with G3 for main results and deliverables. G0 runs only when a `.tex` file changed. "quick" runs G0 and G1 only and never raises a claim status; "full review" runs G0 to G4 and treats the artifact as critical. Under `/orch`, the playbook stage sets the gates.
-- Stopping rules (computed by `scripts/review_status.py`, never by the orchestrator from memory): converged, deadlocked, stalled, round limit. One clean round converges; for main theorems, designs and final deliverables G1, G2 and G4 need two, and at G1 and G2 a clean G3 round at the same content counts as the second. "Same content" hashes the artifact plus model, glossary and the claims it depends on.
+- Gate depth for a commitment: prose or structure only runs G0, G1, G4; statements, proofs, model or findings run G0 to G4, with G3 for main results and deliverables. G0 runs only when a `.tex` file changed; it compiles the paper's `main.tex` (at the project root, else the shallowest one) after the lint. `quick:` runs G0 and G1 only and never raises a claim status; `full:` runs G0 to G4 and treats the artifact as critical. Under `/orch`, the playbook stage sets the gates.
+- Stopping rules (computed by `scripts/review_status.py`, never by the orchestrator from memory): converged, deadlocked, stalled, round limit. One clean round converges; for main theorems, designs and final deliverables G1, G2 and G4 need two, and at G1 and G2 a clean G3 round at the same content counts as the second. "Same content" hashes the artifact plus model, glossary and the claims it depends on; every Review log row carries these hashes, and a clean round without them never converges.
 - Deadlock: `arbiter`, then `arbiter-mythos` (if needs_human or main theorem; for a main theorem its ruling governs), then the human. A producer who rejects an issue again after a reviewer-right ruling goes to the human.
-- `verified` means G1 and G2 (and G3 where required) passed at recorded content. After any edit to LaTeX, pseudocode, the model or the glossary, the regression-checker lists the dependent claims and the orchestrator resets them. A loop that converges while a decision is still provisional leaves its claims `provisional`.
+- `verified` means G1 and G2 (and G3 where required) passed on the same content, by hash. After any edit to LaTeX, pseudocode, the model or the glossary, the regression-checker lists the dependent claims and the orchestrator resets them. A loop that converges while a decision is still provisional leaves its claims `provisional`.
 
 ## 7. Decisions and approvals
 
 - **Classes** (full table in `approvals.md`): blocking (asked now: contract and playbook approval, scope and contract changes, a request that changes a deliverable, a new SoW, main theorem statements, milestones and final deliverables, an unresolved deadlock on a main theorem, anything irreversible); checkpoint (recommendation taken provisionally, dependent claims marked `provisional`, confirmed in a batch; also stalled loops, round limits and other deadlocks); logged (routing, retries, budgets, minor fixes).
 - **Decision card**: one-sentence question; 2 to 4 options with consequences; recommendation and reason; dependent claim and assumption IDs; evidence pointers. Dialogs show a compressed card (question, options, the recommendation's reason) and must be self-contained (never "as shown above").
-- **Checkpoint**: one screen of pending provisional decisions, with "accept all" or individual reversal; reversal re-queues dependent work.
+- **Checkpoint**: one screen of pending provisional decisions, open questions and the decisions the system took alone (no token usage), with "accept all" or individual reversal; the first dialog names each decision and the option taken. Reversal re-queues dependent work.
 - **Approval packet** (summarizer): what was produced, what changed, review findings and resolutions, what is uncertain, what approval unlocks.
 - **Budgets** are automatic per stage type and recalibrated from logged usage each time `rw` starts. Overrun: extend once by 50% if the last round found new issues, otherwise treat as stalled. Only the subscription limit reaches the human, as a notification.
 
@@ -113,10 +113,10 @@ Dispatched only by the orchestrator (main session). Shared rules in the `agent-p
 
 All hooks live in `hooks/rw_hooks.py`. Except the status line, they do nothing outside a project with `.work/` (found through `$CLAUDE_PROJECT_DIR`, so a session must start at the project folder), and fail open on script errors.
 
-- SessionStart: binding files; the project digest (start of `state.md` and the latest handoff); outside `rw`, the direct-mode instructions and open or deferred requests; after compaction, an instruction to hand off and re-read the binding files. Records the baseline that Stop and PreCompact compare against. Pending capture from the previous session: *not built*.
+- SessionStart: binding files; the project digest (start of `state.md` and the latest handoff); outside `rw`, the direct-mode instructions, unprocessed files in `resources/`, and open or deferred requests; after compaction, an instruction to hand off and re-read the binding files. Records the baseline that Stop and PreCompact compare against. Pending capture from the previous session: *not built*.
 - UserPromptSubmit: rules card every prompt. Outside `rw`, a prompt not starting with `raw:` or `/` is saved and routed to the `request` skill. Full digest on first prompt, after compaction and when memory changed, and relevant ideas and dead ends otherwise: *not built*.
-- PreCompact: blocks manual compaction with unrecorded work; never blocks auto-compaction (writes a snapshot instead).
-- Stop: blocks only for unrecorded changes to the paper, deliverable or claims. Never for discussion, never for the workflow's own bookkeeping. Under `rw` it also marks the session ended and, on an `/orch` turn, keeps the session from ending while it should ask or wait.
+- PreCompact: blocks manual compaction with unrecorded work (as for Stop); never blocks auto-compaction (writes a snapshot instead).
+- Stop: blocks only for unrecorded changes to the paper, deliverable or claims: project commits, uncommitted project files this session wrote with file tools (the human's own edits do not count), and `.work/claims.md`. A change is recorded once `state.md` is updated after it. Never for discussion, never for the workflow's own bookkeeping. Under `rw` it also marks the session ended and, on an `/orch` turn, keeps the session from ending while it should ask or wait.
 - PreToolUse on file tools and Bash: reviewer write guard, the summarizer's packets-only guard, and a push guard that refuses pushing `.work` or workflow branches.
 - PreToolUse on AskUserQuestion: a desktop notification that input is needed.
 - PostToolUse on Agent: logs tokens per dispatch to `.work/usage.tsv` and a global log; near the context limit, tells the orchestrator to finish the round and hand off.
@@ -133,7 +133,7 @@ All hooks live in `hooks/rw_hooks.py`. Except the status line, they do nothing o
 ## 10. Commits
 
 - No AI attribution, co-author trailers or AI references anywhere. The owner's commit style is in the `commit-style` skill, derived from his own history.
-- Project repo commits describe what changed in the project, with no workflow terms, and stage only files under the project's subfolder (never `git add -A`).
+- Project repo commits describe what changed in the project, with no workflow terms, and stage only files under the project's subfolder (never `git add -A`). `repos.py commit` refuses while a workflow file is tracked or an exclude line is missing.
 - Workflow state is committed in the `.work` repo. Workflow branches are local only.
 
 ## 11. Working on this repo
@@ -167,8 +167,8 @@ Decisions that changed the design, with reasons. Append new entries.
 ## 13. Status
 
 - Built and tested: agents, gates, Codex wrapper, hooks, lint, review status, interaction redesign, commit style, repo separation, subfolder support, direct mode.
-- Not built: conversation-first mode (history entry 10): conversation as default, commitment on request or offer, `quick:` and `full:` prefixes, quick probes, capture, threads, ideas, session summaries, the SessionEnd hook, digest and idea injection on prompts. Direct mode runs in its place.
+- Not built: conversation-first mode (history entry 10): conversation as default, commitment on request or offer, quick probes, capture, threads, ideas, session summaries, the SessionEnd hook, digest and idea injection on prompts. Direct mode runs in its place.
 - Pilot: first run exposed the interaction problems (history entry 5). Rerun of the proof stages (false lemma, forced deadlock) pending; until reviewed, `verified` is not fully trusted and the owner reads results himself.
 - First real project migrated (a client project in a subfolder of a larger repo).
-- Known open issues at time of writing: `review_status.py` ignoring legacy issues without a status field; `repos.py check` requiring a leading slash on exclude lines; checkpoint dialog not self-contained; template placeholder claim treated as real.
+- Known open issues at time of writing: template placeholder claim treated as real.
 - Not started: prompt 02 (domain knowledge), migration of other projects.

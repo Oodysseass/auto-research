@@ -218,16 +218,29 @@ def collect_labels(root):
     return labels
 
 
+def find_main(root):
+    """main.tex at the root, else the shallowest one below it (outside output/ and hidden directories)."""
+    if (root / "main.tex").is_file():
+        return root / "main.tex"
+    found = [p for p in root.rglob("main.tex")
+             if not any(part == "output" or part.startswith(".") for part in p.relative_to(root).parts[:-1])]
+    return min(found, key=lambda p: (len(p.parts), str(p))) if found else None
+
+
 def build(root):
+    main = find_main(root)
+    if main is None:
+        return Finding("build", "minor", "main.tex", 1, "latexmk", "No main.tex found; the build was skipped.",
+                       "Name the paper's root file main.tex.")
     try:
         r = subprocess.run(["latexmk", "-synctex=1", "-pdf", "-interaction=nonstopmode", "-outdir=output", "main.tex"],
-                           cwd=root, capture_output=True, text=True, timeout=600)
+                           cwd=main.parent, capture_output=True, text=True, timeout=600)
     except FileNotFoundError:
         return Finding("build", "blocking", "main.tex", 1, "latexmk", "latexmk is not installed.", "Install TeX Live / latexmk.")
     if r.returncode == 0:
         return None
     tail = "\n".join((r.stdout + r.stderr).strip().splitlines()[-15:])
-    return Finding("build", "blocking", "main.tex", 1, "latexmk", "latexmk failed. Last lines:\n" + tail, "Fix the build errors.")
+    return Finding("build", "blocking", str(main.relative_to(root)), 1, "latexmk", "latexmk failed. Last lines:\n" + tail, "Fix the build errors.")
 
 
 # ---------- report ----------

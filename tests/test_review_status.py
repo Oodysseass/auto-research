@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -405,7 +406,7 @@ def test_all_adds_artifact_reports_to_legacy_counts(tmp_path):
     assert res["total"]["blocking"] == per_artifact["blocking"] + 1
 
 
-def test_report_issue_with_closed_status_does_not_count(tmp_path):
+def test_report_issue_status_is_ignored_outside_legacy_files(tmp_path):
     src = FIX / "open"
     subprocess.run(["cp", "-R", str(src), str(tmp_path / "p")], check=True)
     d = tmp_path / "p" / ".work" / "issues"
@@ -416,7 +417,7 @@ def test_report_issue_with_closed_status_does_not_count(tmp_path):
     rep["issues"][0]["status"] = "closed"
     f.write_text(json.dumps(rep))
     after = review_status.analyse(d, "lemma")["open_issues"]
-    assert sum(after.values()) == sum(before.values()) - 1
+    assert after == before
 
 
 def test_cli_all(tmp_path):
@@ -427,3 +428,28 @@ def test_cli_all(tmp_path):
     assert r.returncode == 0, r.stderr
     assert r.stdout.splitlines() == ["legacy-open.json: blocking 0, major 1, minor 0",
                                      "open issues: blocking 0, major 1, minor 0"]
+
+
+def test_validator_allows_status_only_in_legacy_files(tmp_path):
+    schema = ROOT / "schemas" / "issue-report.schema.json"
+    rep = {"gate": "G2", "reviewer": "proof-checker", "model": "m", "artifact": "a", "commit": "x+y", "verdict": "accept",
+           "issues": [{"id": "G2/proof-checker/1", "severity": "minor", "location": "a:1", "claim": None,
+                       "evidence": "e", "suggested_fix": "f", "status": "closed"}]}
+    for name, want in (("lemma.G2.proof-checker.r1.json", 1), ("legacy-open.json", 0)):
+        p = tmp_path / name
+        p.write_text(json.dumps(rep))
+        r = subprocess.run([sys.executable, str(ROOT / "scripts" / "validate_issue_json.py"), str(schema), str(p)],
+                           capture_output=True, text=True)
+        assert r.returncode == want, (name, r.stdout)
+
+
+def test_clean_round_without_hashes_does_not_converge(tmp_path):
+    subprocess.run(["cp", "-R", str(FIX / "converged"), str(tmp_path / "p")], check=True)
+    root = tmp_path / "p"
+    for b in (root / ".work" / "briefs").glob("*.md"):
+        lines = b.read_text().splitlines()
+        b.write_text("\n".join(re.sub(r"\|[^|]*\|\s*$", "|  |", l) if re.match(r"^\|\s*\d+\s*\|", l) else l
+                               for l in lines) + "\n")
+    o = review_status.analyse(root / ".work" / "issues", "lemma")["overall"]
+    assert o["status"] == "open" and "no content hashes" in json.dumps(review_status.analyse(
+        root / ".work" / "issues", "lemma"))

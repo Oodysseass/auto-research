@@ -147,3 +147,17 @@ def test_build_failure_is_blocking(tmp_path):
     code, rep = run(tmp_path, "--build")
     b = by_rule(rep, "build")
     assert len(b) == 1 and b[0]["severity"] == "blocking" and code == 1
+
+
+def test_build_finds_main_in_subfolder_and_skips_without_one(tmp_path):
+    (tmp_path / "paper").mkdir()
+    (tmp_path / "paper" / "main.tex").write_text("\\documentclass{article}\\begin{document}\\undefinedmacro\\end{document}\n")
+    code, rep = run(tmp_path, "--build")
+    b = by_rule(rep, "build")
+    assert len(b) == 1 and b[0]["severity"] == "blocking" and b[0]["location"].startswith("paper/main.tex")
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / "notes.tex").write_text("Text.\n")
+    code, rep = run(other, "--build")
+    b = by_rule(rep, "build")
+    assert len(b) == 1 and b[0]["severity"] == "minor" and "skipped" in b[0]["evidence"]

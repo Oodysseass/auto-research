@@ -151,9 +151,10 @@ def main(argv):
     chk = subprocess.run([sys.executable, str(DOTCLAUDE / "scripts" / "repos.py"), "check"], capture_output=True, text=True)
     if chk.returncode != 0:
         print("rw: the project's repos are not set up for the workflow:\n" + chk.stdout + chk.stderr +
-              "rw: `python3 ~/dotclaude/scripts/repos.py init` makes .work/ its own repo and adds the exclude lines.\n"
-              "rw: a workflow file tracked by the project repo must be untracked first (ask in a plain `claude` session).\n"
-              "rw: projects in the old one-repo layout: follow ~/dotclaude/setup-prompts/03_migrate_project.md.", file=sys.stderr)
+              "rw: to fix it, start `claude` in this folder and type one of these, then run rw again:\n"
+              "rw:   raw: run ~/dotclaude/scripts/repos.py init and check, and untrack the workflow files it lists after asking me\n"
+              "rw:   raw: migrate this project with ~/dotclaude/setup-prompts/03_migrate_project.md   (old one-repo layout)",
+              file=sys.stderr)
         return 2
     res = subprocess.run([sys.executable, str(DOTCLAUDE / "scripts" / "resources.py"), "scan"], capture_output=True, text=True)
     last = (res.stdout.strip().splitlines() or [""])[-1]

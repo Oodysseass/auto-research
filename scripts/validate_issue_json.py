@@ -16,6 +16,8 @@ import re
 import sys
 from pathlib import Path
 
+LEGACY_NAME = re.compile(r"^legacy[\w.-]*\.json$")
+
 SCHEMA_DIR = Path(__file__).resolve().parent.parent / "schemas"
 TYPES = {
     "object": dict, "array": list, "string": str, "null": type(None),
@@ -82,6 +84,10 @@ def main(argv):
             ok = False
             continue
         ok &= validate(argv[0], data, f)
+        if not LEGACY_NAME.match(Path(f).name) and any(isinstance(i, dict) and "status" in i
+                                                       for i in (data.get("issues") or [] if isinstance(data, dict) else [])):
+            print(f"FAIL {f}: `status` is allowed only in legacy files (legacy*.json)")
+            ok = False
     return 0 if ok else 1
 
 

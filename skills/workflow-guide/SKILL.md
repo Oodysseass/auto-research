@@ -1,9 +1,13 @@
 ---
 name: workflow-guide
-description: Answers the human's questions about how the research workflow works, or what a workflow command (/orch, /intake, /gate, /why, /wstatus, rw, raw:), file, gate, claim status or decision class means, from ~/dotclaude/DESIGN.md. Load only when the human asks such a question. Never load it on your own to plan or do work. Read-only.
+description: Answers the human's questions about how the research workflow works, or what a workflow command (/orch, /intake, /gate, /why, /wstatus, rw, raw:), file, gate, claim status or decision class means, from ~/dotclaude/DESIGN.md. Read-only. Usage /workflow-guide <question>.
+argument-hint: "<question about the workflow>"
+disable-model-invocation: true
 ---
 
 # Workflow guide
+
+Question: `$ARGUMENTS`. If it is empty, ask what the human wants to know.
 
 Answer the human's question about the workflow. Read-only: never edit, commit, dispatch or run workflow scripts.
 

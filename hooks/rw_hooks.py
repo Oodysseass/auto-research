@@ -10,7 +10,11 @@ Notifications: $RW_NOTIFY_CMD <title> <message> if set, else osascript on macOS.
 bin/rw sets RW_LOOP=1 and RW_RUN=<id>; the Stop hook uses them to end a session after /handoff.
 Direct mode (no RW_LOOP): session-start reminds the session that typed prompts are requests (request skill); prompt saves
 each typed prompt for scripts/request.py and points to the skill, except `raw:` prompts (bypass) and `/` commands.
-Internal errors fail open: exit 0 with no output, so a bug never blocks a session.
+Stop and PreCompact block only for unrecorded work: commits to the project, uncommitted project edits made by this session's
+file tools, and changes to .work/claims.md, each newer than the last change of .work/state.md. Workflow bookkeeping elsewhere
+in .work/ never counts.
+Internal errors fail open: exit 0 with no output, so a bug never blocks a session. That includes an import error in the
+scripts this module uses.
 Stdlib only. Never reads or sets API keys.
 """
 import hashlib
@@ -25,10 +29,15 @@ from pathlib import Path
 
 DOTCLAUDE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(DOTCLAUDE / "scripts"))
-import repos  # noqa: E402
-import request  # noqa: E402
-
-repos.TIMEOUT = 5
+try:
+    import repos  # noqa: E402
+    import request  # noqa: E402
+    import resources  # noqa: E402
+    repos.TIMEOUT = 5
+    IMPORT_ERROR = None
+except Exception as _e:  # fail open: reported and ignored in main()
+    repos = request = resources = None
+    IMPORT_ERROR = _e
 RULES_CARD = DOTCLAUDE / "rules-card.md"
 STATE_DIR = Path(os.environ.get("RW_HOOKS_STATE_DIR", Path(tempfile.gettempdir()) / "rw-hooks"))
 STATE_LINES, HANDOFF_LINES = 80, 60
@@ -44,8 +53,8 @@ WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 # Context threshold for ending an orchestrator session: min(RW_CONTEXT_LIMIT, 60% of the window). See orch skill.
 CONTEXT_LIMIT = int(os.environ.get("RW_CONTEXT_LIMIT", "300000"))
 CONTEXT_FRACTION = 0.6
-# Files under .work/ that hooks and scripts write automatically; they never count as unrecorded work.
-AUTO_FILES = {"usage.tsv"}
+# The only .work/ file whose changes count as unrecorded work. Other .work/ files are workflow bookkeeping.
+CLAIMS = "claims.md"
 
 
 def project_dir(inp):
@@ -75,16 +84,23 @@ def heads(proj):
             "work": git(proj / ".work", "rev-parse", "--verify", "-q", "HEAD") if (proj / ".work" / ".git").exists() else None}
 
 
+def dirty_files(proj):
+    """{project-relative path: hash} of every uncommitted path in the project repo (limited to the project)."""
+    top, sub = repos.layout(proj)
+    if top is None:
+        return {}
+    out = {}
+    for _, path, _ in repos.raw_status(top, sub):
+        rel = repos.display(path, sub, "")
+        out[rel] = file_hash(proj / rel)
+    return out
+
+
 def snapshot(proj):
-    """Fingerprint of the session-relevant state: HEADs of both repos, state.md, and every other file under .work/."""
+    """Fingerprint of the session-relevant state: HEADs of both repos, state.md, claims.md, uncommitted project files."""
     work = proj / ".work"
-    files = {}
-    for p in sorted(work.rglob("*")):
-        rel = p.relative_to(work)
-        if (p.is_file() and not any(part.startswith(".") for part in rel.parts) and p != work / "state.md"
-                and str(rel) not in AUTO_FILES):
-            files[str(rel)] = file_hash(p)
-    return {"heads": heads(proj), "state": file_hash(work / "state.md"), "work": files}
+    return {"heads": heads(proj), "state": file_hash(work / "state.md"), "claims": file_hash(work / CLAIMS),
+            "dirty": dirty_files(proj)}
 
 
 def baseline_path(inp):
@@ -104,24 +120,67 @@ def save_baseline(inp, proj):
     baseline_path(inp).write_text(json.dumps(snapshot(proj)))
 
 
+def mtime(p):
+    try:
+        return p.stat().st_mtime
+    except OSError:
+        return datetime.now().timestamp()
+
+
+def session_edits(inp):
+    """Real paths of files this session wrote with file tools, from the transcript. None if there is no transcript."""
+    try:
+        lines = Path(inp.get("transcript_path")).read_text().splitlines()
+    except (OSError, TypeError):
+        return None
+    out = set()
+    for line in lines:
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        c = (e.get("message") or {}).get("content")
+        for x in c if isinstance(c, list) else []:
+            if isinstance(x, dict) and x.get("type") == "tool_use" and x.get("name") in WRITE_TOOLS:
+                ti = x.get("input") or {}
+                raw = ti.get("file_path") or ti.get("notebook_path")
+                if raw:
+                    out.add(os.path.realpath(raw if os.path.isabs(raw) else Path(inp.get("cwd") or ".") / raw))
+    return out
+
+
 def unrecorded_work(inp, proj):
-    """Changes since session start that state.md does not reflect.
-    Returns (commits, changed .work files) if HEAD moved or .work/ changed while state.md did not; else None."""
+    """Work since session start that state.md does not reflect: project commits, uncommitted project files this session
+    wrote (all changed files if there is no transcript), and claims.md. A change counts as recorded when state.md
+    changed since session start and its last change is no older than the change. Returns (commits, changed paths)
+    with project-relative paths, or None."""
     base = load_baseline(inp)
     if base is None:
         return None
     now = snapshot(proj)
-    if now["state"] != base["state"]:
-        return None
-    changed = sorted(k for k in set(now["work"]) | set(base["work"]) if now["work"].get(k) != base["work"].get(k))
+    st = proj / ".work" / "state.md"
+    recorded_at = mtime(st) if now["state"] != base.get("state") else float("-inf")
+    pending = lambda t: t > recorded_at
     commits = []
     old = base.get("heads") or {"project": base.get("head"), "work": None}
     top, sub = repos.layout(proj)
-    for name, cwd, spec in (("project", top or proj, repos.spec(sub)), ("work", proj / ".work", [])):
-        a, b = old.get(name), now["heads"].get(name)
-        if b and a != b:
-            log = git(cwd, "log", "--oneline", f"{a}..{b}" if a else b, *spec)
-            commits += [f"{name} {c}" for c in (log.splitlines() if log else [b[:7]])]
+    a, b = old.get("project"), now["heads"].get("project")
+    if top and b and a != b:
+        log = git(top, "log", "--format=%ct %h %s", f"{a}..{b}" if a else b, *repos.spec(sub)) or ""
+        for line in log.splitlines():
+            t, rest = line.split(" ", 1)
+            if pending(int(t)):
+                commits.append(f"project {rest}")
+    changed = []
+    if now["claims"] != base.get("claims") and pending(mtime(proj / ".work" / CLAIMS)):
+        changed.append(f".work/{CLAIMS}")
+    mine = session_edits(inp)
+    was = base.get("dirty") or {}
+    for rel, h in sorted(now["dirty"].items()):
+        if was.get(rel) == h or not pending(mtime(proj / rel)):
+            continue
+        if mine is None or os.path.realpath(proj / rel) in mine:
+            changed.append(rel)
     if not changed and not commits:
         return None
     return commits, changed
@@ -130,10 +189,10 @@ def unrecorded_work(inp, proj):
 def describe(commits, changed):
     parts = []
     if commits:
-        parts.append(f"{len(commits)} commit(s)")
+        parts.append(f"{len(commits)} commit(s) to the project")
     if changed:
-        shown = ", ".join(f".work/{c}" for c in changed[:5])
-        parts.append(f"edits to {shown}" + (f" and {len(changed) - 5} more" if len(changed) > 5 else ""))
+        shown = ", ".join(changed[:5])
+        parts.append(f"changes to {shown}" + (f" and {len(changed) - 5} more" if len(changed) > 5 else ""))
     return " and ".join(parts)
 
 
@@ -185,6 +244,17 @@ def direct_mode_notes(proj):
                           (proj / ".work" / "requests.md").read_text(), re.M)
     except OSError:
         reqs = []
+    try:
+        r = resources.scan(proj) if (proj / resources.MANIFEST).is_file() else None
+    except Exception:
+        r = None
+    if r and (r["new"] or r["edited"] or r["deleted"]):
+        listed = [f"new {x['path']}" for x in r["new"]] + [f"edited {x['path']}" for x in r["edited"]] + \
+                 [f"deleted {x['path']}" for x in r["deleted"]]
+        out.append("Unprocessed inputs in resources/: " + ", ".join(listed[:10]) +
+                   (f" and {len(listed) - 10} more" if len(listed) > 10 else "") +
+                   ". Process them before the next request, as in the orch skill \"New inputs in resources/\" "
+                   "(scan --warn, then record or raise each new file).")
     if reqs:
         out.append("Requests not finished: " + ", ".join(f"{r} ({s})" for r, s in reqs) +
                    " (`python3 ~/dotclaude/scripts/request.py list`).")
@@ -246,7 +316,7 @@ def write_snapshot(inp, proj, why):
         f"- HEADs at session start: {fmt_heads(base.get('heads') or {'project': base.get('head')})}\n"
         f"- HEADs now: {fmt_heads(heads(proj))}\n\n"
         "## Commits this session\n\n" + ("\n".join(f"- {c}" for c in commits) or "- none") + "\n\n"
-        "## .work files changed this session\n\n" + ("\n".join(f"- .work/{c}" for c in changed) or "- none") + "\n\n"
+        "## Unrecorded changes (paper, deliverable, claims)\n\n" + ("\n".join(f"- {c}" for c in changed) or "- none") + "\n\n"
         "## git status of both repos (project-relative paths)\n\n```\n" + status + "\n```\n")
     return out
 
@@ -254,8 +324,8 @@ def write_snapshot(inp, proj, why):
 def pre_compact(inp, proj):
     pending = unrecorded_work(inp, proj)
     if pending and inp.get("trigger") == "manual":
-        sys.stderr.write(f"Research workflow: compaction blocked. This session made {describe(*pending)}, "
-                         "but .work/state.md is unchanged. Run /handoff first, then /compact.\n")
+        sys.stderr.write(f"Research workflow: compaction blocked. This session made {describe(*pending)} "
+                         "that .work/state.md does not record yet. Run /handoff first, then /compact.\n")
         sys.exit(2)
     if pending:
         # Auto-compaction: never block (blocking a context-limit recovery fails the request). Write a snapshot instead.
@@ -325,9 +395,8 @@ def stop(inp, proj):
     pending = unrecorded_work(inp, proj)
     if pending:
         emit({"decision": "block", "reason":
-              f"Research workflow: this session made {describe(*pending)}, but .work/state.md is unchanged since the "
-              "session started. Run /handoff before stopping (in direct mode: finish the request's report step, which "
-              "updates state.md)."})
+              f"Research workflow: this session made {describe(*pending)} that .work/state.md does not record yet. "
+              "Run /handoff before stopping (in direct mode: finish the request's report step, which updates state.md)."})
         return
     end = end_marker(proj)
     if this_run(end):
@@ -548,6 +617,8 @@ def main():
         proj = project_dir(inp)
         if not (proj / ".work").is_dir():
             return 0
+        if IMPORT_ERROR is not None:
+            raise IMPORT_ERROR
         EVENTS[sys.argv[1]](inp, proj)
     except SystemExit:
         raise

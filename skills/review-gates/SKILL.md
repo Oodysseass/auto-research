@@ -14,7 +14,7 @@ Gates run in this order. A gate runs only after the previous gate has converged.
 
 | Gate | Reviewer | Runs on |
 |---|---|---|
-| G0 mechanical | `python3 ~/dotclaude/scripts/lint_tex.py --artifact <path> --out <report> [--previous <last report>]`. No model. | every `.tex` change |
+| G0 mechanical | `python3 ~/dotclaude/scripts/lint_tex.py --build --artifact <path> --out <report> [--previous <last report>]` (lint, then compile with latexmk). No model. | every `.tex` change |
 | G1 conformance | `conformance-reviewer` | every artifact, before any technical review |
 | G2 technical | `assumption-auditor`, then `proof-checker`, then `counterexample-hunter`; `citation-verifier` for artifacts with citations | definitions, statements, proofs, designs, findings |
 | G3 cross-model | Codex, via the codex-review skill | critical artifacts (below) |
@@ -100,9 +100,10 @@ Effect of the governing ruling:
 
 ## Verified claims
 
-A claim becomes `verified` only when G1 and G2 have converged, and G3 where required, all at one commit with no edits in between.
+A claim becomes `verified` only when G1 and G2 have converged, and G3 where required, all on the same content (equal
+`review_status.py --hashes` values) with no edits in between.
 The orchestrator then writes `verified_by` in `claims.md`, one item per gate reviewer: `<gate>:<reviewer>:<model>@<commit>`,
-with `<commit>` = `<project>+<.work>` from `repos.py rev` (the project repo and the `.work` repo).
-A claim that converged at an earlier commit, then was edited, is `checked` until the gates converge again.
-After every edit, dispatch `regression-checker` and reset the claims it lists from `verified` to `checked`.
+with `<commit>` = `<project>+<.work>` from `repos.py rev` (the project repo and the `.work` repo), recorded for tracing only.
+A claim whose content changed after it converged is `checked` until the gates converge again.
+After every edit to LaTeX, pseudocode, `model.md` or `glossary.md`, dispatch `regression-checker` and reset the claims it lists from `verified` to `checked`.
 An accepted counterexample sets `refuted` with `refuted_by` pointing to the issue ID. Refuted claims are never deleted.

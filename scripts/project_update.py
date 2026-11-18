@@ -11,8 +11,12 @@ Direct mode (every typed prompt is a request, `request` skill):
 - .work/approvals.md gets the request rows of the template's Class table that it lacks.
 - .work/briefs/_template.md gets the `- request:` field.
 - .work/resources.manifest is created (resources.py init) if the project has none.
+- .work/contract.md: deliverable IDs D<n> become DL<n> (the Deliverables table's ID column and the Requirements
+  table's Deliverable column only), because D<n> means a decision card everywhere else.
 The .work files it changed are committed in the .work repo ("add request registry"), only those files, unless --no-commit.
-CLAUDE.md is in neither repo. Prints one line per change, or "up to date".
+CLAUDE.md is in neither repo. If the project repo tracks the CLAUDE.md it would edit, nothing changes and it exits 1:
+workflow text must never enter the project's shared history; untrack the file first (intake, step on tracked files).
+Prints one line per change, or "up to date".
 """
 import argparse
 import re
@@ -31,11 +35,24 @@ def section(text, heading):
     return m.group(0).rstrip("\n") + "\n\n" if m else None
 
 
+class TrackedError(Exception):
+    pass
+
+
+def tracked(p):
+    r = subprocess.run(["git", "-C", str(p.parent), "ls-files", "--error-unmatch", "--", p.name],
+                       capture_output=True, text=True)
+    return p.parent.is_dir() and r.returncode == 0
+
+
 def update_claude_md(root):
     p = next((x for x in (root / "CLAUDE.md", root / ".claude" / "CLAUDE.md") if x.is_file()), root / "CLAUDE.md")
     text = p.read_text() if p.is_file() else ""
     if "## Direct mode" in text:
         return None
+    if tracked(p):
+        raise TrackedError(f"{p.relative_to(root)} is tracked by the project repo; adding workflow text would put it in "
+                           "shared history. Untrack it first (git rm --cached, then repos.py init for the excludes).")
     sec = section((TEMPLATE / "CLAUDE.md").read_text(), "## Direct mode")
     for anchor in ("## Build", "## Project-specific rules"):
         m = re.search(rf"(?m)^{re.escape(anchor)}\s*$", text)
@@ -67,6 +84,38 @@ def update_approvals(root):
     return p
 
 
+def update_contract_ids(root):
+    """Rename deliverable IDs D<n> to DL<n> in the column headed "ID" of the Deliverables table and the column headed
+    "Deliverable" of the Requirements table. Other columns and sections are left alone."""
+    p = root / ".work" / "contract.md"
+    if not p.is_file():
+        return None
+    lines, section, col, changed = p.read_text().splitlines(), None, None, False
+    want = {"Deliverables": "ID", "Requirements": "Deliverable"}
+    for i, line in enumerate(lines):
+        if line.startswith("## "):
+            section, col = line[3:].strip(), None
+            continue
+        if section not in want or not line.startswith("|"):
+            continue
+        cells = line.split("|")
+        if col is None:
+            heads = [c.strip() for c in cells]
+            col = heads.index(want[section]) if want[section] in heads else -1
+            continue
+        if col < 0 or col >= len(cells) or set(cells[1].strip()) <= set("-:"):
+            continue
+        new = re.sub(r"\bD(\d+)\b", r"DL\1", cells[col])
+        if new != cells[col]:
+            cells[col] = new
+            lines[i] = "|".join(cells)
+            changed = True
+    if not changed:
+        return None
+    p.write_text("\n".join(lines) + "\n")
+    return p
+
+
 def update_brief_template(root):
     p = root / ".work" / "briefs" / "_template.md"
     if not p.is_file():
@@ -91,7 +140,11 @@ def main(argv=None):
         print("project_update: no .work/ here: run from the project root", file=sys.stderr)
         return 2
     changed = []
-    c = update_claude_md(root)
+    try:
+        c = update_claude_md(root)
+    except TrackedError as e:
+        print(f"project_update: {e} Nothing changed.", file=sys.stderr)
+        return 1
     if c:
         print(f"added the Direct mode section to {c.relative_to(root)}")
     reg = root / ".work" / "requests.md"
@@ -100,7 +153,8 @@ def main(argv=None):
         changed.append(reg)
         print("created .work/requests.md")
     for fn, what in ((update_approvals, "added request rows to .work/approvals.md"),
-                     (update_brief_template, "added the request field to .work/briefs/_template.md")):
+                     (update_brief_template, "added the request field to .work/briefs/_template.md"),
+                     (update_contract_ids, "renamed deliverable IDs in .work/contract.md to DL<n>")):
         p = fn(root)
         if p:
             changed.append(p)

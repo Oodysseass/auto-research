@@ -33,8 +33,9 @@ Intake runs in the main session. It produces no paper content and dispatches no 
      `git rm -r --cached resources` and one commit on the current branch, in the human's commit style, no workflow terms
      (e.g. `stop tracking resources folder`). Show the exact message in the option's description, and say that coauthors who pull
      the commit lose those files from their working tree (the files stay on disk here).
-   - A tracked `CLAUDE.md` or `.claude/`: same question. If it stays tracked, write the workflow's project instructions to
-     `.claude/CLAUDE.md` only if `.claude/` is untracked; otherwise ask where they go. Never put workflow text in a tracked file.
+   - A tracked `CLAUDE.md` or `.claude/`: these must be untracked; `repos.py check` fails and `rw` refuses to start otherwise.
+     Ask once, options "Untrack them" (same commit rules and coauthor note as above) and "Stop intake". Never put workflow text
+     in a tracked file.
 6. Scaffold `.work/` from `~/dotclaude/templates/project/.work/` (including `decisions/` and `packets/`), and the project `CLAUDE.md`
    from `~/dotclaude/templates/project/CLAUDE.md`. Never overwrite an existing project `CLAUDE.md`; propose a diff instead.
 7. Classify the project. Use the table below. If two types fit, or the signals are weak, ask.

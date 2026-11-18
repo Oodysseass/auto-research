@@ -152,7 +152,7 @@ def test_record_appends_to_brief_and_registry(env, tmp_path, proj):
     scan = subprocess.run([sys.executable, str(RES), "--root", str(proj), "scan"], capture_output=True, text=True)
     assert "0 new, 0 edited" in scan.stdout
     # a second request the same day: same heading, next ID
-    submit(env, tmp_path, "full review of lemma 2")
+    submit(env, tmp_path, "full: review lemma 2")
     out = json.loads(run(env, proj, "record", "--session", "s1", "--slug", "lemma 2", "--title", "t").stdout)
     assert out["id"] == "RQ2" and out["mode"] == "full"
     assert (proj / "resources" / "BRIEF.md").read_text().count("## Requests ") == 1
@@ -315,3 +315,53 @@ def test_project_update_is_idempotent(env, proj):
     again = subprocess.run([sys.executable, str(UPD), "--root", str(proj)], capture_output=True, text=True)
     assert again.stdout.strip() == "up to date"
     assert (proj / "CLAUDE.md").read_text() == md
+
+
+def test_project_update_refuses_tracked_claude_md(env, proj):
+    (proj / "CLAUDE.md").write_text("# Project\n")
+    g(proj, "add", "-f", "CLAUDE.md")
+    g(proj, "commit", "-qm", "add notes")
+    r = subprocess.run([sys.executable, str(UPD), "--root", str(proj)], capture_output=True, text=True)
+    assert r.returncode == 1 and "tracked" in r.stderr
+    assert (proj / "CLAUDE.md").read_text() == "# Project\n"
+    assert not (proj / ".work" / "requests.md").exists()
+
+
+def test_mode_needs_a_prefix():
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import request
+    assert request.mode_of("quick: fix the figure") == "quick"
+    assert request.mode_of("  Full: prove lemma 2") == "full"
+    assert request.mode_of("a quick question about lemma 2") == "default"
+    assert request.mode_of("do a full review of lemma 2") == "default"
+
+
+def test_project_update_renames_deliverable_ids(env, proj):
+    (proj / "CLAUDE.md").write_text("# Project\n\n## Direct mode\n\nx\n")
+    (proj / ".work" / "contract.md").write_text(
+        "# Contract\n\n## Requirements\n\n| ID | Requirement | Source | Deliverable |\n|---|---|---|---|\n"
+        "| R1 | Prove safety | resources/BRIEF.md:3 | D1, D2 |\n\n## Deliverables\n\n"
+        "| ID | Deliverable | Covers | Milestone | Due |\n|---|---|---|---|---|\n| D1 | report | R1 | M1 | 2026-12-01 |\n"
+        "| D2 | proof | R1 | M1 | 2026-12-01 |\n\n## Approval\n\n- changes since approval: D3 accepted\n")
+    r = subprocess.run([sys.executable, str(UPD), "--root", str(proj), "--no-commit"], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    c = (proj / ".work" / "contract.md").read_text()
+    assert "| DL1, DL2 |" in c and "| DL1 | report |" in c and "| DL2 | proof |" in c and "D3 accepted" in c
+    again = subprocess.run([sys.executable, str(UPD), "--root", str(proj), "--no-commit"], capture_output=True, text=True)
+    assert "renamed" not in again.stdout and (proj / ".work" / "contract.md").read_text() == c
+
+
+def test_project_update_leaves_decision_columns_alone(env, proj):
+    before = (proj / ".work" / "contract.md").read_text()
+    subprocess.run([sys.executable, str(UPD), "--root", str(proj), "--no-commit"], check=True, capture_output=True)
+    assert (proj / ".work" / "contract.md").read_text() == before
+
+
+def test_session_start_lists_unprocessed_resources(env, proj):
+    (proj / "resources" / "sow-v2.pdf").write_bytes(b"%PDF new")
+    (proj / "resources" / "BRIEF.md").write_text("# Project brief\n\nchanged\n")
+    out = ctx(hook(env, "session-start", {"session_id": "s1", "source": "startup"}))
+    assert "Unprocessed inputs in resources/" in out and "new resources/sow-v2.pdf" in out
+    assert "edited resources/BRIEF.md" in out
+    out = ctx(hook(env, "session-start", {"session_id": "s2", "source": "startup"}, RW_LOOP="1"))
+    assert "Unprocessed inputs" not in out

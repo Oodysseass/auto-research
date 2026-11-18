@@ -323,6 +323,12 @@ def do_commit(root, message, paths):
     require(root)
     if not message.strip():
         raise UsageError("empty commit message")
+    wf, _ = tracked(root)
+    miss = missing_excludes(root)
+    if wf or miss:
+        raise UsageError("refusing to commit: " + "; ".join(
+            ([f"workflow files tracked by the project repo: {', '.join(wf)} (untrack them first)"] if wf else []) +
+            ([f"exclude lines missing: {' '.join(miss)} (run repos.py init)"] if miss else [])))
     rels = []
     for p in paths or ["."]:
         a = (Path(p) if Path(p).is_absolute() else root / p).resolve()

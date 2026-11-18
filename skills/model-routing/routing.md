@@ -123,7 +123,7 @@ Budgets are never a human decision. They never appear in a question, card, packe
 - Overrun: `review_status.py` decides. New issues in the latest round: `extend-budget`, once by 50%, logged. Otherwise the loop is
   stalled (review-gates rule 3). Round limits and stall detection are the real stops.
 - The only usage event that reaches the human is the subscription limit: `rw` pauses, notifies, and resumes after the reset.
-- Token usage reaches the human only in the checkpoint screen, as information.
+- Token usage never reaches the human: not in the checkpoint screen, a card, a packet or an approval.
 - A T3 dispatch needs no approval. It is logged like every routing choice.
 
 ## Logging

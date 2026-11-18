@@ -29,7 +29,7 @@ session and notifying me when my input is needed. `/why <ID>` explains any claim
 In a plain `claude` session here, every prompt I type is a request, handled by the `request` skill, unless it starts with
 `raw:` (answered directly, outside the harness) or `/` (a command). The skill records the request in `resources/BRIEF.md`
 (attachments in `resources/<date>-<slug>/`, listed in the manifest), checks it against the contract, model and claims,
-does it with gates proportional to what it touches ("quick" or "full review" in the prompt overrides), reports a short
+does it with gates proportional to what it touches (a `quick:` or `full:` prefix overrides), reports a short
 packet, commits in both repos and waits. It never continues into playbook stages unless I ask. Registry: `.work/requests.md`.
 
 ## Build

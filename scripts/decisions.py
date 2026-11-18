@@ -11,7 +11,7 @@ Usage (run from the project root, or pass --root):
   decisions.py reverse D<n> --to X       reverse a provisional decision: dependent claims back to draft, briefs requeued
   decisions.py checkpoint [--questions] [--close]
                                          the checkpoint screen: pending provisional cards, open cards, digest of logged
-                                         decisions since the last checkpoint, usage (information only).
+                                         decisions since the last checkpoint. No token usage.
                                          --questions prints the first dialog (JSON). --close records the checkpoint.
 
 Dependent claims of a card: the C-IDs in `depends`, the claims whose `assumptions` use an A-ID in `depends`,
@@ -373,18 +373,6 @@ def digest(root):
     return out
 
 
-def usage_summary(root):
-    p = Path(root) / ".work" / "usage.tsv"
-    if not p.is_file():
-        return []
-    per = {}
-    for line in p.read_text().splitlines()[1:]:
-        cols = line.split("\t")
-        if len(cols) >= 6 and cols[5].isdigit():
-            per[cols[3]] = per.get(cols[3], 0) + int(cols[5])
-    return [f"{b}: {n // 1000}k" for b, n in sorted(per.items())] + ([f"total: {sum(per.values()) // 1000}k"] if per else [])
-
-
 def checkpoint_screen(root):
     cards = all_cards(root)
     prov = [c for c in cards if c.get("status") == "provisional"]
@@ -407,16 +395,14 @@ def checkpoint_screen(root):
     out += [f"- **{c['id']}** ({c['class']}) {c['question']}" for c in opened] or ["- none"]
     out += ["", "## Decided by the system since the last checkpoint", ""]
     out += [f"- {d}" for d in digest(root)] or ["- none"]
-    use = usage_summary(root)
-    out += ["", "## Usage (information only)", ""] + ([f"- {u}" for u in use] or ["- none logged"])
     return "\n".join(out) + "\n", prov
 
 
 def checkpoint_questions(prov):
     if not prov:
         return []
-    names = ", ".join(c["id"] for c in prov)
-    return [{"question": f"Accept all {len(prov)} provisional decisions ({names}) as shown above?", "header": "Checkpoint",
+    taken = "; ".join(f"{c['id']} ({c['question'].rstrip('?')}): {option(c, c['answer'])['label']}" for c in prov)
+    return [{"question": f"Make these {len(prov)} provisional decisions final? {taken}.", "header": "Checkpoint",
              "multiSelect": False, "options": [
                  {"label": "Accept all (Recommended)", "description": "Every provisional decision becomes final. Work continues."},
                  {"label": "Review individually", "description": "One question per decision; any can be reversed."}]}]
