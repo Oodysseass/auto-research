@@ -10,6 +10,7 @@ Project instructions for this repo only. The root `CLAUDE.md` is the owner's glo
 
 ## Keeping DESIGN.md current
 
-- Any change that alters behavior updates `DESIGN.md` in the same commit.
+- Any change that alters behavior updates `DESIGN.md` in the same commit, and `README.md` (the user guide) when it
+  changes what the owner types, sees or checks.
 - A design change also gets a new entry in section 12 (design history), with the reason.
-- `DESIGN.md` never names a client or a client project.
+- `DESIGN.md` and `README.md` never name a client or a client project.

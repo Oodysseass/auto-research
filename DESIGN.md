@@ -144,7 +144,7 @@ All hooks live in `hooks/rw_hooks.py`. Except the status line, they do nothing o
 - Stage changes, show the plan, wait for OK on anything non-trivial.
 - Show the exact diff and wait for OK before changing `~/.claude/settings.json`; back it up first.
 - Run `scripts/run_tests.sh` before committing. Add tests for every behavior change.
-- Any change that alters behavior updates this file in the same commit. A design change also gets a new entry in section 12 with the reason. The repo-level instructions (`.claude/CLAUDE.md`) load this file in every session started at the repo root.
+- Any change that alters behavior updates this file in the same commit, and `README.md` when it changes what the owner types, sees or checks. A design change also gets a new entry in section 12 with the reason. The repo-level instructions (`.claude/CLAUDE.md`) load this file in every session started at the repo root.
 - This file never names a client or a client project.
 - No em dashes in any file. Commit in the owner's style.
 - Nothing from client projects may enter this repo.
@@ -165,7 +165,7 @@ Decisions that changed the design, with reasons. Append new entries.
 8. `.work/` as its own repo, excludes via `.git/info/exclude`, `resources/` untracked and append-only with a manifest: workflow must not appear in shared history; resources are inputs, often confidential or non-redistributable.
 9. Subfolder projects supported: real projects live inside larger repos.
 10. Direct mode (every prompt a request) replaced by conversation first: research is mostly discussion; tasks emerge from it.
-11. Design overview wired into the tooling: `.claude/CLAUDE.md` loads this file for sessions in this repo, and the `workflow-guide` skill answers questions about the workflow from it in any project: intent must stay next to the code and be answerable without opening files.
+11. Design overview wired into the tooling: `.claude/CLAUDE.md` loads this file for sessions in this repo, and the `workflow-guide` skill answers questions about the workflow from it and from `README.md` (the user guide) in any project: intent must stay next to the code and be answerable without opening files.
 12. Conversation-first mode built, and an editable agenda (`threads.md`) replaces the fixed playbook stage order for `rw`: research intentions change during a project (new directions, reprioritised or dropped work), and the human must be able to reshape the plan in conversation without editing the contract.
 13. Plain words for the human, IDs only in `Refs:`: in the first live project, questions and reports were dense with claim, requirement, assumption and decision IDs and brief line pointers, and the human could not follow them.
 14. Agenda edits are planning, not requests: replacing the slate in the first live project was recorded as a request and blocked on a contract card before the plan changed; scope questions now wait for the thread that needs them.
